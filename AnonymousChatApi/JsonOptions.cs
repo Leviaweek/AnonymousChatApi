@@ -4,7 +4,7 @@ namespace AnonymousChatApi;
 
 public static class JsonOptions
 {
-    public static JsonSerializerOptions UlidOptions { get; } = new()
+    public static JsonSerializerOptions Options { get; } = new()
     {
         Converters =
         {

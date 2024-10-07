@@ -1,5 +1,8 @@
 using System.Text.Json;
+using AnonymousChatApi;
 using AnonymousChatApi.Databases;
+using AnonymousChatApi.Jwt;
+using AnonymousChatApi.Models;
 using AnonymousChatApi.Services;
 using Cysharp.Serialization.Json;
 
@@ -27,8 +30,15 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 });
 builder.Services.AddSingleton<EventMessageHandler>();
 
+var jwtSecret = builder.Configuration[JwtConfigOptions.OptionsName];
+if (jwtSecret is null)
+    throw new ArgumentException("Invalid jwt secret");
+
+builder.Services.AddSingleton<Jwt<JwtPayload>>(_ => new Jwt<JwtPayload>(jwtSecret));
+
 var app = builder.Build();
 
+app.UseMiddleware<AuthenticationMiddleware>();
 app.UseRouting();
 app.UseCors();
 app.MapControllers();

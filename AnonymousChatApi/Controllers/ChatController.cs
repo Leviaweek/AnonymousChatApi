@@ -1,24 +1,40 @@
+using System.Security.Claims;
 using AnonymousChatApi.Databases;
+using AnonymousChatApi.Jwt;
 using AnonymousChatApi.Models;
+using AnonymousChatApi.Models.Requests;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 
 namespace AnonymousChatApi.Controllers;
 
 [Route("/chat")]
-public sealed class ChatController(AnonymousChatDb db): ControllerBase
+public sealed class ChatController(AnonymousChatDb db, Jwt<JwtPayload> jwt): ControllerBase
 {
     [HttpPost("create")]
-    public Ok<Chat> CreateChat([FromQuery] string name)
+    public Results<Ok<Chat>, NotFound> CreateChat([FromBody] CreateChatRequest request)
     {
-        var chat = db.AddChat(name);
+        var token = User.FindFirstValue(Constants.JwtTokenClaimType);
+
+        if (token is null)
+            return TypedResults.NotFound();
+        
+        var chat = db.AddChat(request.Name);
         return TypedResults.Ok(chat);
     }
 
     [HttpPost("join")]
-    public Results<Ok, BadRequest> Join([FromQuery] Ulid userId, [FromQuery] Ulid chatId)
+    public Results<Ok, BadRequest> Join([FromBody] JoinChatRequest request)
     {
-        var result = db.AddUserToChat(userId, chatId);
+        var token = User.FindFirstValue(Constants.JwtTokenClaimType);
+        var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+
+        if (token is null || userId is null)
+            return TypedResults.BadRequest();
+
+        var ulidId = Ulid.Parse(userId);
+        
+        var result = db.AddUserToChat(ulidId, request.ChatId);
         if (!result)
             return TypedResults.BadRequest();
 
@@ -26,11 +42,19 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
     }
 
     [HttpPost("join-random")]
-    public Results<Ok<Chat>, NotFound> JoinRandom([FromQuery] Ulid userId)
+    public Results<Ok<Chat>, NotFound> JoinRandom()
     {
+        var token = User.FindFirstValue(Constants.JwtTokenClaimType);
+        var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+
+        if (token is null || userId is null)
+            return TypedResults.NotFound();
+
+        var ulidId = Ulid.Parse(userId);
+        
         var chat = db.GetRandomChat();
 
-        var result = db.AddUserToChat(userId, chat.Id);
+        var result = db.AddUserToChat(ulidId, chat.Id);
 
         if (!result)
             return TypedResults.NotFound();

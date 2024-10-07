@@ -23,7 +23,7 @@ public sealed class EventMessageHandler
         await foreach (var message in session.Channel.Reader.ReadAllAsync(cancellationToken))
         {
             var serialized = JsonSerializer.Serialize(message, message.GetType(),
-                JsonOptions.UlidOptions);
+                JsonOptions.Options);
             await action(message.EventName, serialized, cancellationToken);
         }
     }

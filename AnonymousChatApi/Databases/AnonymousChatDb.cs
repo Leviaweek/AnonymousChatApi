@@ -4,6 +4,7 @@ using AnonymousChatApi.Services;
 
 namespace AnonymousChatApi.Databases;
 
+//ToDo be sure to replace with ef core
 public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessageHandler messageHandler)
 {
     private readonly Dictionary<Ulid, User> _users = [];
@@ -13,11 +14,11 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
     private readonly Dictionary<Ulid, HashSet<Ulid>> _chatUsers = [];
     
     private readonly ConcurrentDictionary<Ulid, HashSet<Ulid>> _chatMessagesIndex = [];
-    public async Task<ChatMessage?> AddMessageAsync(ChatMessage message, CancellationToken cancellationToken)
+    public async Task<ChatMessage?> AddMessageAsync(Ulid senderId, ChatMessage message, CancellationToken cancellationToken)
     {
          message = message with { Id = Ulid.NewUlid() };
 
-        if (!_users.TryGetValue(message.SenderId, out var user))
+        if (!_users.TryGetValue(senderId, out var user))
             return null;
 
         if (!_chatUsers.TryGetValue(message.ChatId, out var users))
@@ -113,9 +114,18 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
         return user;
     }
 
+    public bool ContainsUser(string login)
+    {
+        foreach (var (_, user) in _users)
+            if (user.Login == login)
+                return true;
+
+        return false;
+    }
+    
     public User? GetUser(string login, string password)
     {
-        foreach (var (id, user) in _users)
+        foreach (var (_, user) in _users)
             if (user.Login == login && user.Password == password)
                 return user;
 

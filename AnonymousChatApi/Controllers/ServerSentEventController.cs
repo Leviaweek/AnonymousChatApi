@@ -1,6 +1,8 @@
+using System.Security.Claims;
 using System.Text.Json;
 using AnonymousChatApi.Abstractions;
 using AnonymousChatApi.Databases;
+using AnonymousChatApi.Jwt;
 using AnonymousChatApi.Models;
 using AnonymousChatApi.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -12,23 +14,29 @@ namespace AnonymousChatApi.Controllers;
 [Route("event")]
 public sealed class ServerSentEventController(
     AnonymousChatDb db,
-    EventMessageHandler messageHandler) : ControllerBase
+    EventMessageHandler messageHandler,
+    Jwt<JwtPayload> jwt) : ControllerBase
 {
     [HttpGet("subscribe")]
-    public async Task<Results<EmptyHttpResult, NotFound>> SubscribeAsync([FromQuery] string userId,
-        CancellationToken cancellationToken)
+    public async Task<Results<EmptyHttpResult, NotFound>> SubscribeAsync(CancellationToken cancellationToken)
     {
-        if (!Ulid.TryParse(userId, out var userIdUlid))
+        var token = User.FindFirstValue(Constants.JwtTokenClaimType);
+        var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+
+        if (token is null || userId is null)
             return TypedResults.NotFound();
 
-        var user = db.GetUserById(userIdUlid);
+        var ulidId = Ulid.Parse(userId);
+        
+        var user = db.GetUserById(ulidId);
+        
         if (user is null)
             return TypedResults.NotFound();
         
         HttpContext.Response.Headers.Append("Content-Type", "text/event-stream");
         HttpContext.Response.Headers.Append("Cache-Control", "no-cache");
         HttpContext.Response.Headers.Append("X-Accel-Buffering", "no");
-        var task = messageHandler.SubscribeOnMessageAsync(userIdUlid, EventActionAsync, cancellationToken);
+        var task = messageHandler.SubscribeOnMessageAsync(ulidId, EventActionAsync, cancellationToken);
 
         await task;
 
