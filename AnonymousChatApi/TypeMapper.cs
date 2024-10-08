@@ -1,4 +1,3 @@
-using AnonymousChatApi.Models;
 using AnonymousChatApi.Models.Db;
 using AnonymousChatApi.Models.Dtos;
 
@@ -10,7 +9,8 @@ public static class TypeMapper
         new(ChatId: message.ChatId,
             Id: message.Id,
             Text: message.Text,
-            TimeStamp: message.TimeStamp);
+            TimeStamp: message.TimeStamp,
+            SenderId: message.SenderId);
 
     public static DbChatMessage ToDb(this ChatMessageDto dto, Ulid id) => new(
         SenderId: id,

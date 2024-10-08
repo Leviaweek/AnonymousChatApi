@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using AnonymousChatApi.Databases;
-using AnonymousChatApi.Models;
 using AnonymousChatApi.Models.Dtos;
 using AnonymousChatApi.Models.Requests;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -24,7 +23,7 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
     }
 
     [HttpPost("join")]
-    public Results<Ok, BadRequest> Join([FromBody] JoinChatRequest request)
+    public async Task<Results<Ok, BadRequest>> JoinAsync([FromBody] JoinChatRequest request, CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
 
@@ -33,7 +32,8 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
 
         var ulidId = Ulid.Parse(userId);
         
-        var result = db.AddUserToChat(ulidId, request.ChatId);
+        var result = await db.AddUserToChatAsync(ulidId, request.ChatId, cancellationToken);
+        
         if (!result)
             return TypedResults.BadRequest();
 
@@ -41,7 +41,7 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
     }
 
     [HttpPost("join-random")]
-    public Results<Ok<ChatDto>, NotFound> JoinRandom()
+    public async Task<Results<Ok<ChatDto>, NotFound>> JoinRandomAsync(CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
 
@@ -52,7 +52,7 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
         
         var chat = db.GetRandomChat();
 
-        var result = db.AddUserToChat(ulidId, chat.Id);
+        var result = await db.AddUserToChatAsync(ulidId, chat.Id, cancellationToken);
 
         if (!result)
             return TypedResults.NotFound();

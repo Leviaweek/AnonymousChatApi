@@ -1,7 +1,5 @@
 using System.Security.Claims;
 using AnonymousChatApi.Databases;
-using AnonymousChatApi.Jwt;
-using AnonymousChatApi.Models;
 using AnonymousChatApi.Models.Dtos;
 using AnonymousChatApi.Models.Requests;
 using Microsoft.AspNetCore.Http.HttpResults;

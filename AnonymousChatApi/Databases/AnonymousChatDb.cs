@@ -1,12 +1,11 @@
 using System.Collections.Concurrent;
-using AnonymousChatApi.Models;
 using AnonymousChatApi.Models.Db;
-using AnonymousChatApi.Services;
+using EventHandler = AnonymousChatApi.Services.EventHandler;
 
 namespace AnonymousChatApi.Databases;
 
 //ToDo be sure to replace with ef core
-public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessageHandler messageHandler)
+public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventHandler handler)
 {
     private readonly Dictionary<Ulid, DbUser> _users = [];
     private readonly ConcurrentDictionary<Ulid, DbChat> _chats = [];
@@ -40,7 +39,7 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
 
         foreach (var chatUserId in users)
         {
-            await messageHandler.OnNewMessageAsync(chatUserId, message, cancellationToken);
+            await handler.OnNewMessageAsync(chatUserId, message.ToDto(), cancellationToken);
         }
         
         return message;
@@ -90,7 +89,7 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
         return chat;
     }
 
-    public bool AddUserToChat(Ulid userId, Ulid chatId)
+    public async Task<bool> AddUserToChatAsync(Ulid userId, Ulid chatId, CancellationToken cancellationToken)
     {
         if (!_users.ContainsKey(userId))
             return false;
@@ -104,6 +103,11 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
             _chatUsers.Add(chatId, users);
         }
 
+        foreach (var user in users)
+        {
+            await handler.OnUserJoinAsync(user, chatId, cancellationToken);
+        }
+        
         return users.Add(userId);
     }
 

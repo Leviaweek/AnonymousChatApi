@@ -1,12 +1,8 @@
 using System.Security.Claims;
-using System.Text.Json;
-using AnonymousChatApi.Abstractions;
 using AnonymousChatApi.Databases;
-using AnonymousChatApi.Jwt;
-using AnonymousChatApi.Models;
-using AnonymousChatApi.Services;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using EventHandler = AnonymousChatApi.Services.EventHandler;
 
 namespace AnonymousChatApi.Controllers;
 
@@ -14,7 +10,7 @@ namespace AnonymousChatApi.Controllers;
 [Route("event")]
 public sealed class ServerSentEventController(
     AnonymousChatDb db,
-    EventMessageHandler messageHandler) : ControllerBase
+    EventHandler handler) : ControllerBase
 {
     [HttpGet("subscribe")]
     public async Task<Results<EmptyHttpResult, NotFound>> SubscribeAsync(CancellationToken cancellationToken)
@@ -34,7 +30,7 @@ public sealed class ServerSentEventController(
         HttpContext.Response.Headers.Append("Content-Type", "text/event-stream");
         HttpContext.Response.Headers.Append("Cache-Control", "no-cache");
         HttpContext.Response.Headers.Append("X-Accel-Buffering", "no");
-        var task = messageHandler.SubscribeOnMessageAsync(ulidId, EventActionAsync, cancellationToken);
+        var task = handler.SubscribeOnEventAsync(ulidId, EventActionAsync, cancellationToken);
 
         await task;
 

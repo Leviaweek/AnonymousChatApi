@@ -1,4 +1,6 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using Cysharp.Serialization.Json;
 
 namespace AnonymousChatApi;
 
@@ -8,8 +10,9 @@ public static class JsonOptions
     {
         Converters =
         {
-            new Cysharp.Serialization.Json.UlidJsonConverter()
+            new UlidJsonConverter()
         },
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 }

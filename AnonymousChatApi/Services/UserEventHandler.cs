@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Threading.Channels;
+using AnonymousChatApi.Models;
 
 namespace AnonymousChatApi.Services;
 
@@ -32,9 +33,4 @@ public sealed class UserEventHandler<T>(Action selfDestruct)
         foreach (var (_, session) in _sessions)
             await session.Writer.WriteAsync(@event, cancellationToken);
     }
-}
-
-public sealed record UserSubscription<T>(Channel<T> Channel, Action Unsubscribe): IDisposable
-{
-    public void Dispose() => Unsubscribe();
 }

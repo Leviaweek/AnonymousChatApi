@@ -1,16 +1,16 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using AnonymousChatApi.Abstractions;
-using AnonymousChatApi.Models;
-using AnonymousChatApi.Models.Db;
+using AnonymousChatApi.Models.Dtos;
+using AnonymousChatApi.Models.Events;
 
 namespace AnonymousChatApi.Services;
 
-public sealed class EventMessageHandler
+public sealed class EventHandler
 {
     private readonly ConcurrentDictionary<Ulid, UserEventHandler<EventBase>> _eventHandlers = [];
     
-    public async Task SubscribeOnMessageAsync(Ulid userId,
+    public async Task SubscribeOnEventAsync(Ulid userId,
         Func<string, string, CancellationToken, Task> action, CancellationToken cancellationToken)
     {
         if (!_eventHandlers.TryGetValue(userId, out var eventHandler))
@@ -23,13 +23,12 @@ public sealed class EventMessageHandler
         
         await foreach (var message in session.Channel.Reader.ReadAllAsync(cancellationToken))
         {
-            var serialized = JsonSerializer.Serialize(message, message.GetType(),
-                JsonOptions.Options);
+            var serialized = JsonSerializer.Serialize(message, message.GetType(), JsonOptions.Options);
             await action(message.EventName, serialized, cancellationToken);
         }
     }
 
-    public async Task OnNewMessageAsync(Ulid userId, DbChatMessage message, CancellationToken cancellationToken)
+    public async Task OnNewMessageAsync(Ulid userId, ChatMessageDto message, CancellationToken cancellationToken)
     {
         if (!_eventHandlers.TryGetValue(userId, out var handler))
             return;
@@ -37,5 +36,15 @@ public sealed class EventMessageHandler
         var newMessageEvent = new NewMessageEvent(message);
 
         await handler.BroadcastEventAsync(newMessageEvent, cancellationToken);
+    }
+
+    public async Task OnUserJoinAsync(Ulid userId, Ulid chatId, CancellationToken cancellationToken)
+    {
+        if (!_eventHandlers.TryGetValue(userId, out var handler))
+            return;
+        
+        var userJoinEvent = new UserJoinEvent(new UserJoinDto(userId, chatId, DateTimeOffset.UtcNow));
+
+        await handler.BroadcastEventAsync(userJoinEvent, cancellationToken);
     }
 }

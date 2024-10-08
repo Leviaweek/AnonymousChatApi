@@ -2,7 +2,6 @@ using AnonymousChatApi.Databases;
 using AnonymousChatApi.Jwt;
 using AnonymousChatApi.Models;
 using AnonymousChatApi.Models.Requests;
-using AnonymousChatApi.Models.Responses;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
 

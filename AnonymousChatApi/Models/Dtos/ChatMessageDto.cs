@@ -5,4 +5,5 @@ public sealed record ChatMessageDto(
     Ulid ChatId,
     Ulid Id,
     string Text,
-    DateTimeOffset TimeStamp);
+    DateTimeOffset TimeStamp,
+    Ulid? SenderId = null);

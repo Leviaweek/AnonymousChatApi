@@ -3,8 +3,8 @@ using AnonymousChatApi;
 using AnonymousChatApi.Databases;
 using AnonymousChatApi.Jwt;
 using AnonymousChatApi.Models;
-using AnonymousChatApi.Services;
 using Cysharp.Serialization.Json;
+using EventHandler = AnonymousChatApi.Services.EventHandler;
 
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,7 +28,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     options.SerializerOptions.Converters.Add(new UlidJsonConverter());
     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
 });
-builder.Services.AddSingleton<EventMessageHandler>();
+builder.Services.AddSingleton<EventHandler>();
 
 var jwtSecret = builder.Configuration[JwtConfigOptions.OptionsName];
 if (jwtSecret is null)
