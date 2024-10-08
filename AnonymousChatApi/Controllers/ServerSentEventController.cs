@@ -14,16 +14,14 @@ namespace AnonymousChatApi.Controllers;
 [Route("event")]
 public sealed class ServerSentEventController(
     AnonymousChatDb db,
-    EventMessageHandler messageHandler,
-    Jwt<JwtPayload> jwt) : ControllerBase
+    EventMessageHandler messageHandler) : ControllerBase
 {
     [HttpGet("subscribe")]
     public async Task<Results<EmptyHttpResult, NotFound>> SubscribeAsync(CancellationToken cancellationToken)
     {
-        var token = User.FindFirstValue(Constants.JwtTokenClaimType);
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
 
-        if (token is null || userId is null)
+        if (userId is null)
             return TypedResults.NotFound();
 
         var ulidId = Ulid.Parse(userId);

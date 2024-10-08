@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using AnonymousChatApi.Databases;
-using AnonymousChatApi.Jwt;
 using AnonymousChatApi.Models;
 using AnonymousChatApi.Models.Requests;
 using Microsoft.AspNetCore.Http.HttpResults;
@@ -9,7 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace AnonymousChatApi.Controllers;
 
 [Route("/chat")]
-public sealed class ChatController(AnonymousChatDb db, Jwt<JwtPayload> jwt): ControllerBase
+public sealed class ChatController(AnonymousChatDb db): ControllerBase
 {
     [HttpPost("create")]
     public Results<Ok<Chat>, NotFound> CreateChat([FromBody] CreateChatRequest request)
@@ -26,10 +25,9 @@ public sealed class ChatController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
     [HttpPost("join")]
     public Results<Ok, BadRequest> Join([FromBody] JoinChatRequest request)
     {
-        var token = User.FindFirstValue(Constants.JwtTokenClaimType);
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
 
-        if (token is null || userId is null)
+        if (userId is null)
             return TypedResults.BadRequest();
 
         var ulidId = Ulid.Parse(userId);
@@ -44,10 +42,9 @@ public sealed class ChatController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
     [HttpPost("join-random")]
     public Results<Ok<Chat>, NotFound> JoinRandom()
     {
-        var token = User.FindFirstValue(Constants.JwtTokenClaimType);
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
 
-        if (token is null || userId is null)
+        if (userId is null)
             return TypedResults.NotFound();
 
         var ulidId = Ulid.Parse(userId);

@@ -9,15 +9,14 @@ using Microsoft.AspNetCore.Mvc;
 namespace AnonymousChatApi.Controllers;
 
 [Route("/message")]
-public sealed class MessageController(AnonymousChatDb anonymousChatDb, Jwt<JwtPayload> jwt): ControllerBase
+public sealed class MessageController(AnonymousChatDb anonymousChatDb): ControllerBase
 {
     [HttpGet("getMessages")]
     public Results<Ok<List<ChatMessage>>, NotFound> GetMessages([FromBody]GetMessagesRequest request)
     {
-        var token = User.FindFirstValue(Constants.JwtTokenClaimType);
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
 
-        if (token is null || userId is null)
+        if (userId is null)
             return TypedResults.NotFound();
 
         var ulidId = Ulid.Parse(userId);
@@ -28,10 +27,9 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb, Jwt<JwtPa
     [HttpPost]
     public async Task<Results<Ok<ChatMessageDto>, BadRequest>> SendMessageAsync([FromBody]ChatMessage message, CancellationToken cancellationToken)
     {
-        var token = User.FindFirstValue(Constants.JwtTokenClaimType);
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
 
-        if (token is null || userId is null)
+        if (userId is null)
             return TypedResults.BadRequest();
 
         var ulidId = Ulid.Parse(userId);

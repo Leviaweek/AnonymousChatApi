@@ -7,26 +7,23 @@ namespace AnonymousChatApi;
 public class AuthenticationMiddleware
 {
     private readonly RequestDelegate _next;
-    private readonly string _jwtSecret;
+    private readonly Jwt<JwtPayload> _jwt;
 
-    public AuthenticationMiddleware(RequestDelegate next, IConfiguration configuration)
+    public AuthenticationMiddleware(RequestDelegate next, Jwt<JwtPayload> jwt)
     {
         _next = next;
-        var jwtSecret = configuration[JwtConfigOptions.OptionsName];
-        _jwtSecret = jwtSecret ?? throw new ArgumentException("Invalid jwt secret");
+        _jwt = jwt;
     }
 
     public async Task InvokeAsync(HttpContext context)
     {
         if (context.Request.Cookies.TryGetValue(Constants.CookieTokenString, out var token))
         {
-            var jwt = new Jwt<JwtPayload>(_jwtSecret);
-
-            if (jwt.IsValid(token))
+            if (_jwt.IsValid(token))
             {
                 var payload = JwtPayload.FromToken(token);
                 
-                List<Claim> claims = [new("token", token), new("userId", payload.Id.ToString())];
+                List<Claim> claims = [new("userId", payload.Id.ToString())];
         
                 var identity = new ClaimsIdentity(claims);
                 
