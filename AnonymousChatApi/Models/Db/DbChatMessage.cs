@@ -1,7 +1,8 @@
-namespace AnonymousChatApi.Models;
+namespace AnonymousChatApi.Models.Db;
 
 [Serializable]
-public sealed record ChatMessage(
+public sealed record DbChatMessage(
+    Ulid SenderId,
     Ulid ChatId,
     Ulid Id,
     string Text,

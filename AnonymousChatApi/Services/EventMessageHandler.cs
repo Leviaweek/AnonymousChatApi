@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Text.Json;
 using AnonymousChatApi.Abstractions;
 using AnonymousChatApi.Models;
+using AnonymousChatApi.Models.Db;
 
 namespace AnonymousChatApi.Services;
 
@@ -28,7 +29,7 @@ public sealed class EventMessageHandler
         }
     }
 
-    public async Task OnNewMessageAsync(Ulid userId, ChatMessage message, CancellationToken cancellationToken)
+    public async Task OnNewMessageAsync(Ulid userId, DbChatMessage message, CancellationToken cancellationToken)
     {
         if (!_eventHandlers.TryGetValue(userId, out var handler))
             return;

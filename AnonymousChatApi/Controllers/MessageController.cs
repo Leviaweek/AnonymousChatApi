@@ -2,6 +2,7 @@ using System.Security.Claims;
 using AnonymousChatApi.Databases;
 using AnonymousChatApi.Jwt;
 using AnonymousChatApi.Models;
+using AnonymousChatApi.Models.Dtos;
 using AnonymousChatApi.Models.Requests;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -12,7 +13,7 @@ namespace AnonymousChatApi.Controllers;
 public sealed class MessageController(AnonymousChatDb anonymousChatDb): ControllerBase
 {
     [HttpGet("getMessages")]
-    public Results<Ok<List<ChatMessage>>, NotFound> GetMessages([FromBody]GetMessagesRequest request)
+    public Results<Ok<List<ChatMessageDto>>, NotFound> GetMessages([FromBody]GetMessagesRequest request)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
 
@@ -20,12 +21,15 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb): Controll
             return TypedResults.NotFound();
 
         var ulidId = Ulid.Parse(userId);
-        
-        return TypedResults.Ok(anonymousChatDb.GetMessages(request.ChatId, ulidId));
+        var messages = anonymousChatDb.GetMessages(request.ChatId, ulidId);
+        if (messages is null)
+            return TypedResults.NotFound();
+        return TypedResults.Ok(messages.Select(x => x.ToDto()).ToList());
     }
 
     [HttpPost]
-    public async Task<Results<Ok<ChatMessageDto>, BadRequest>> SendMessageAsync([FromBody]ChatMessage message, CancellationToken cancellationToken)
+    public async Task<Results<Ok<ChatMessageDto>, BadRequest>> SendMessageAsync([FromBody] ChatMessageDto message,
+        CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
 
@@ -33,11 +37,14 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb): Controll
             return TypedResults.BadRequest();
 
         var ulidId = Ulid.Parse(userId);
+
+        var dbMessage = message.ToDb(ulidId);
         
-        var addedMessage = await anonymousChatDb.AddMessageAsync(ulidId, message, cancellationToken);
-        if (addedMessage is null)
+        dbMessage = await anonymousChatDb.AddMessageAsync(dbMessage, cancellationToken);
+        
+        if (dbMessage is null)
             return TypedResults.BadRequest();
         
-        return TypedResults.Ok(addedMessage.ToDto());
+        return TypedResults.Ok(dbMessage.ToDto());
     }
 }

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using AnonymousChatApi.Models;
+using AnonymousChatApi.Models.Db;
 using AnonymousChatApi.Services;
 
 namespace AnonymousChatApi.Databases;
@@ -7,18 +8,18 @@ namespace AnonymousChatApi.Databases;
 //ToDo be sure to replace with ef core
 public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessageHandler messageHandler)
 {
-    private readonly Dictionary<Ulid, User> _users = [];
-    private readonly ConcurrentDictionary<Ulid, Chat> _chats = [];
-    private readonly Dictionary<Ulid, ChatMessage> _messages = [];
+    private readonly Dictionary<Ulid, DbUser> _users = [];
+    private readonly ConcurrentDictionary<Ulid, DbChat> _chats = [];
+    private readonly Dictionary<Ulid, DbChatMessage> _messages = [];
     
     private readonly Dictionary<Ulid, HashSet<Ulid>> _chatUsers = [];
     
     private readonly ConcurrentDictionary<Ulid, HashSet<Ulid>> _chatMessagesIndex = [];
-    public async Task<ChatMessage?> AddMessageAsync(Ulid senderId, ChatMessage message, CancellationToken cancellationToken)
+    public async Task<DbChatMessage?> AddMessageAsync(DbChatMessage message, CancellationToken cancellationToken)
     {
          message = message with { Id = Ulid.NewUlid() };
 
-        if (!_users.TryGetValue(senderId, out var user))
+        if (!_users.TryGetValue(message.SenderId, out var user))
             return null;
 
         if (!_chatUsers.TryGetValue(message.ChatId, out var users))
@@ -45,7 +46,7 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
         return message;
     }
     
-    public List<ChatMessage>? GetMessages(Ulid chatId, Ulid userId)
+    public List<DbChatMessage>? GetMessages(Ulid chatId, Ulid userId)
     {
         if (!_chatUsers.TryGetValue(chatId, out var users))
             return null;
@@ -65,7 +66,7 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
             _chatMessagesIndex.TryAdd(chat.Id, messages);
         }
 
-        var resultCollection = new List<ChatMessage>();
+        var resultCollection = new List<DbChatMessage>();
         foreach (var messageId in messages)
         {
             if (!_messages.TryGetValue(messageId, out var message))
@@ -81,10 +82,10 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
         return resultCollection;
     }
 
-    public Chat AddChat(string name)
+    public DbChat AddChat(string name)
     {
         var id = Ulid.NewUlid();
-        var chat = new Chat(id, name, DateTimeOffset.UtcNow);
+        var chat = new DbChat(id, name, DateTimeOffset.UtcNow);
         _chats.TryAdd(id, chat);
         return chat;
     }
@@ -106,10 +107,10 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
         return users.Add(userId);
     }
 
-    public User AddUser(string login, string password)
+    public DbUser AddUser(string login, string password)
     {
         var id = Ulid.NewUlid();
-        var user = new User(id, login, password);
+        var user = new DbUser(id, login, password);
         _users.Add(id, user);
         return user;
     }
@@ -123,7 +124,7 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
         return false;
     }
     
-    public User? GetUser(string login, string password)
+    public DbUser? GetUser(string login, string password)
     {
         foreach (var (_, user) in _users)
             if (user.Login == login && user.Password == password)
@@ -132,7 +133,7 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
         return null;
     }
 
-    public Chat GetRandomChat()
+    public DbChat GetRandomChat()
     {
         var random = new Random();
         if (_chats.IsEmpty)
@@ -144,5 +145,5 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventMessag
         return chat;
     }
 
-    public User? GetUserById(Ulid id) => _users.GetValueOrDefault(id);
+    public DbUser? GetUserById(Ulid id) => _users.GetValueOrDefault(id);
 }

@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using AnonymousChatApi.Databases;
 using AnonymousChatApi.Models;
+using AnonymousChatApi.Models.Dtos;
 using AnonymousChatApi.Models.Requests;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -11,7 +12,7 @@ namespace AnonymousChatApi.Controllers;
 public sealed class ChatController(AnonymousChatDb db): ControllerBase
 {
     [HttpPost("create")]
-    public Results<Ok<Chat>, NotFound> CreateChat([FromBody] CreateChatRequest request)
+    public Results<Ok<ChatDto>, NotFound> CreateChat([FromBody] CreateChatRequest request)
     {
         var token = User.FindFirstValue(Constants.JwtTokenClaimType);
 
@@ -19,7 +20,7 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
             return TypedResults.NotFound();
         
         var chat = db.AddChat(request.Name);
-        return TypedResults.Ok(chat);
+        return TypedResults.Ok(chat.ToDto());
     }
 
     [HttpPost("join")]
@@ -40,7 +41,7 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
     }
 
     [HttpPost("join-random")]
-    public Results<Ok<Chat>, NotFound> JoinRandom()
+    public Results<Ok<ChatDto>, NotFound> JoinRandom()
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
 
@@ -56,6 +57,6 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
         if (!result)
             return TypedResults.NotFound();
         
-        return TypedResults.Ok(chat);
+        return TypedResults.Ok(chat.ToDto());
     }
 }

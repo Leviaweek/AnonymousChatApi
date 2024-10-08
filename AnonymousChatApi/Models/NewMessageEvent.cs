@@ -1,10 +1,11 @@
 using AnonymousChatApi.Abstractions;
+using AnonymousChatApi.Models.Db;
 
 namespace AnonymousChatApi.Models;
 
-public sealed class NewMessageEvent(ChatMessage body)
-    : EventBase, IEvent<ChatMessage>
+public sealed class NewMessageEvent(DbChatMessage body)
+    : EventBase, IEvent<DbChatMessage>
 {
-    public ChatMessage Body { get; } = body;
+    public DbChatMessage Body { get; } = body;
     public override string EventName => "new-message";
 }

@@ -1,8 +1,8 @@
-namespace AnonymousChatApi.Models;
+namespace AnonymousChatApi.Models.Dtos;
 
 [Serializable]
 public sealed record ChatMessageDto(
     Ulid ChatId,
-    Ulid MessageId,
+    Ulid Id,
     string Text,
     DateTimeOffset TimeStamp);
