@@ -10,12 +10,13 @@ namespace AnonymousChatApi.Controllers;
 [Route("/message")]
 public sealed class MessageController(AnonymousChatDb anonymousChatDb): ControllerBase
 {
-    [HttpGet("getMessages")]
+    [HttpGet("get-messages")]
     public Results<Ok<List<ChatMessageDto>>, NotFound> GetMessages([FromBody]GetMessagesRequest request)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+        var lifeTime = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
 
-        if (userId is null)
+        if (userId is null || lifeTime is null)
             return TypedResults.NotFound();
 
         var ulidId = Ulid.Parse(userId);
@@ -30,8 +31,9 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb): Controll
         CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+        var lifeTime = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
 
-        if (userId is null)
+        if (userId is null || lifeTime is null)
             return TypedResults.BadRequest();
 
         var ulidId = Ulid.Parse(userId);

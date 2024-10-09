@@ -1,3 +1,4 @@
+using System.Security.Claims;
 using AnonymousChatApi.Databases;
 using AnonymousChatApi.Jwt;
 using AnonymousChatApi.Models;
@@ -19,9 +20,11 @@ public sealed class UserController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
         if (user is null)
             return TypedResults.NotFound();
 
-        var token = GetToken(user.Id);
+        var accessToken = GetAccessToken(user.Id);
+        var refreshToken = GetRefreshToken(user.Id);
         
-        HttpContext.Response.Cookies.Append(Constants.CookieTokenString, token);
+        HttpContext.Response.Cookies.Append(Constants.CookieAccessTokenString, accessToken, Options.CookieOptions);
+        HttpContext.Response.Cookies.Append(Constants.CookieRefreshTokenString, refreshToken, Options.CookieOptions);
         
         return TypedResults.Ok();
     }
@@ -35,16 +38,52 @@ public sealed class UserController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
             
         var user = db.AddUser(login, password);
 
-        var token = GetToken(user.Id);
+        var accessToken = GetAccessToken(user.Id);
+        var refreshToken = GetRefreshToken(user.Id);
         
-        HttpContext.Response.Cookies.Append(Constants.CookieTokenString, token);
+        HttpContext.Response.Cookies.Append(Constants.CookieAccessTokenString, accessToken, Options.CookieOptions);
+        HttpContext.Response.Cookies.Append(Constants.CookieRefreshTokenString, refreshToken, Options.CookieOptions);
 
         return TypedResults.Ok();
     }
-    
-    private string GetToken(Ulid id)
+
+    [HttpPost("refresh-access-token")]
+    public Results<Ok, BadRequest> RefreshAccessToken()
     {
-        var payload = new JwtPayload(id);
+        var hasRefreshTokenValue = User.FindFirstValue(Constants.JwtHasRefreshTokenType);
+        var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+        
+        if (hasRefreshTokenValue is null || userId is null)
+            return TypedResults.BadRequest();
+
+        var hasRefreshToken = bool.Parse(hasRefreshTokenValue);
+
+        if (!hasRefreshToken)
+            return TypedResults.BadRequest();
+
+        var userIdUlid = Ulid.Parse(userId);
+
+        var user = db.GetUserById(userIdUlid);
+
+        if (user is null)
+            return TypedResults.BadRequest();
+
+        var accessToken = GetAccessToken(userIdUlid);
+        
+        HttpContext.Response.Cookies.Append(Constants.CookieAccessTokenString, accessToken, Options.CookieOptions);
+        return TypedResults.Ok();
+    }
+    
+    private string GetAccessToken(Ulid id)
+    {
+        var payload = new JwtPayload(id, DateTimeOffset.UtcNow, Constants.AccessTokenLifeTime);
+        var token = jwt.CreateToken(payload);
+        return token;
+    }
+
+    private string GetRefreshToken(Ulid id)
+    {
+        var payload = new JwtPayload(id, DateTimeOffset.UtcNow, Constants.RefreshTokenLifeTime, true);
         var token = jwt.CreateToken(payload);
         return token;
     }

@@ -13,9 +13,10 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
     [HttpPost("create")]
     public Results<Ok<ChatDto>, NotFound> CreateChat([FromBody] CreateChatRequest request)
     {
-        var token = User.FindFirstValue(Constants.JwtTokenClaimType);
+        var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+        var lifeTime = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
 
-        if (token is null)
+        if (userId is null || lifeTime is null)
             return TypedResults.NotFound();
         
         var chat = db.AddChat(request.Name);
@@ -26,8 +27,9 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
     public async Task<Results<Ok, BadRequest>> JoinAsync([FromBody] JoinChatRequest request, CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+        var lifeTime = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
 
-        if (userId is null)
+        if (userId is null || lifeTime is null)
             return TypedResults.BadRequest();
 
         var ulidId = Ulid.Parse(userId);
@@ -44,8 +46,9 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
     public async Task<Results<Ok<ChatDto>, NotFound>> JoinRandomAsync(CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+        var lifeTime = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
 
-        if (userId is null)
+        if (userId is null || lifeTime is null)
             return TypedResults.NotFound();
 
         var ulidId = Ulid.Parse(userId);

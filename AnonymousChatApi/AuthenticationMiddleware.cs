@@ -17,14 +17,36 @@ public class AuthenticationMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (context.Request.Cookies.TryGetValue(Constants.CookieTokenString, out var token))
+        if (context.Request.Cookies.TryGetValue(Constants.CookieAccessTokenString, out var token))
         {
             if (_jwt.IsValid(token))
             {
                 var payload = JwtPayload.FromToken(token);
                 
-                List<Claim> claims = [new("userId", payload.Id.ToString())];
+                List<Claim> claims = [
+                    new(Constants.JwtUserIdClaimType, payload.UserId.ToString()),
+                    new(Constants.JwtLifeTimeClaimType, payload.LifeTime.ToString()),
+                    new(Constants.JwtCreatedAtClaimType, payload.CreatedAt.ToString()),
+                ];
         
+                var identity = new ClaimsIdentity(claims);
+
+                context.User.AddIdentity(identity);
+            }
+        }
+
+        if (context.Request.Cookies.TryGetValue(Constants.CookieRefreshTokenString, out token))
+        {
+            if (_jwt.IsValid(token))
+            {
+                var payload = JwtPayload.FromToken(token);
+                
+                List<Claim> claims =
+                [
+                    new(Constants.JwtUserIdClaimType, payload.UserId.ToString()),
+                    new(Constants.JwtHasRefreshTokenType, true.ToString())
+                ];
+
                 var identity = new ClaimsIdentity(claims);
                 
                 context.User.AddIdentity(identity);

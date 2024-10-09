@@ -1,12 +1,20 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using AnonymousChatApi.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AnonymousChatApi.Jwt;
 
-public class Jwt<T>(string secret)
+public sealed class Jwt<T>: IDisposable where T: IJwtPayload
 {
+    private readonly HMACSHA256 _hmacsha256;
+    public Jwt(string secret)
+    {
+        var bytes = Encoding.UTF8.GetBytes(secret);
+        _hmacsha256 = new HMACSHA256(bytes);
+    }
+    
     private const string Header = "{\"alg\":\"HS256\",\"typ\":\"JWT\"}";
 
     public string CreateToken(T payload)
@@ -24,48 +32,48 @@ public class Jwt<T>(string secret)
     }
     private string CreateSignature(string headerPayload)
     {
-        var secretBytes = Encoding.UTF8.GetBytes(secret);
         var headerPayloadBytes = Encoding.UTF8.GetBytes(headerPayload);
-
-        using var hmac = new HMACSHA256(secretBytes);
-        var signatureBytes = hmac.ComputeHash(headerPayloadBytes);
+        var signatureBytes = _hmacsha256.ComputeHash(headerPayloadBytes);
         return Base64UrlEncoder.Encode(signatureBytes);
     }
 
     public bool IsValid(string token)
     {
-        Span<string> parts = token.Split('.');
-        if (parts.Length != 3)
+        ReadOnlySpan<char> tokenSpan = token;
+        Span<Range> destination = stackalloc Range[4];
+        var read =  tokenSpan.Split(destination, '.');
+        if (read != 3)
             return false;
+        
+        var encodedHeader = token[destination[0]];
+        var encodedPayload = token[destination[1]];
+        var providedSignature = token[destination[2]];
 
-        var encodedHeader = parts[0];
-        var encodedPayload = parts[1];
-        var providedSignature = parts[2];
+        var payload = T.FromToken(token);
 
+        if (payload.CreatedAt.Add(payload.LifeTime) < DateTimeOffset.UtcNow)
+        {
+            return false;
+        }
+        
         var headerPayload = $"{encodedHeader}.{encodedPayload}";
         
         var calculatedSignature = CreateSignature(headerPayload);
         
         if (providedSignature != calculatedSignature)
             return false;
-    
-        return ValidateExpiration(encodedPayload);
-    }
-
-    private static bool ValidateExpiration(string encodedPayload)
-    {
-        var payloadJson = Base64UrlEncoder.Decode(encodedPayload);
-
-        try
-        {
-            JsonSerializer.Deserialize<T>(payloadJson);
-        }
-        catch (JsonException)
-        {
-            return false;
-        }
 
         return true;
     }
-  
+
+    public void Dispose()
+    {
+        _hmacsha256.Dispose();
+        GC.SuppressFinalize(this);
+    }
+
+    ~Jwt()
+    {
+        Dispose();
+    }
 }

@@ -1,12 +1,19 @@
 using System.Text.Json;
+using AnonymousChatApi.Abstractions;
 using Microsoft.IdentityModel.Tokens;
 
 namespace AnonymousChatApi.Models;
 
 [Serializable]
-public sealed record JwtPayload(Ulid Id)
+public sealed class JwtPayload(Ulid userId, DateTimeOffset createdAt, TimeSpan lifeTime, bool isRefreshToken = false): IJwtPayload
 {
-    public static JwtPayload FromToken(string token)
+
+    public Ulid UserId { get; } = userId;
+    public DateTimeOffset CreatedAt { get; } = createdAt;
+    public TimeSpan LifeTime { get; } = lifeTime;
+    public bool IsRefreshToken { get; } = isRefreshToken;
+    
+    public static IJwtPayload FromToken(string token)
     {
         if (token.Split('.') is not [_, var encodedPayload, _])
         {

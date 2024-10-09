@@ -15,12 +15,16 @@ public sealed class ServerSentEventController(
     [HttpGet("subscribe")]
     public async Task<Results<EmptyHttpResult, NotFound>> SubscribeAsync(CancellationToken cancellationToken)
     {
-        var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+        var userIdString = User.FindFirstValue(Constants.JwtUserIdClaimType);
+        var lifeTimeString = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
+        var createdAtString = User.FindFirstValue(Constants.JwtCreatedAtClaimType);
 
-        if (userId is null)
+        if (userIdString is null || lifeTimeString is null || createdAtString is null)
             return TypedResults.NotFound();
 
-        var ulidId = Ulid.Parse(userId);
+        var ulidId = Ulid.Parse(userIdString);
+        var lifeTime = TimeSpan.Parse(lifeTimeString);
+        var createdAt = DateTimeOffset.Parse(createdAtString);
         
         var user = db.GetUserById(ulidId);
         
@@ -30,9 +34,27 @@ public sealed class ServerSentEventController(
         HttpContext.Response.Headers.Append("Content-Type", "text/event-stream");
         HttpContext.Response.Headers.Append("Cache-Control", "no-cache");
         HttpContext.Response.Headers.Append("X-Accel-Buffering", "no");
-        var task = handler.SubscribeOnEventAsync(ulidId, EventActionAsync, cancellationToken);
 
-        await task;
+        var delay = createdAt.Add(lifeTime) - DateTimeOffset.UtcNow;
+
+        if (delay < TimeSpan.Zero)
+        {
+            Console.WriteLine("Dropped");
+            return TypedResults.NotFound();
+        }
+        
+        using var source = new CancellationTokenSource(delay);
+        using var linkedSource = CancellationTokenSource.CreateLinkedTokenSource(source.Token, cancellationToken);
+
+        try
+        {
+            var task = handler.SubscribeOnEventAsync(ulidId, EventActionAsync, linkedSource.Token);
+
+            await task;
+        }
+        catch (OperationCanceledException)
+        {
+        }
 
         return TypedResults.Empty;
     }

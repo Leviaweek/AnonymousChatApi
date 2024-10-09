@@ -4,9 +4,9 @@ using Cysharp.Serialization.Json;
 
 namespace AnonymousChatApi;
 
-public static class JsonOptions
+public static class Options
 {
-    public static JsonSerializerOptions Options { get; } = new()
+    public static JsonSerializerOptions JsonOptions { get; } = new()
     {
         Converters =
         {
@@ -14,5 +14,11 @@ public static class JsonOptions
         },
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+
+    public static CookieOptions CookieOptions { get; } = new()
+    {
+        Secure = true,
+        HttpOnly = true
     };
 }
