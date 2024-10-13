@@ -5,6 +5,7 @@ using AnonymousChatApi.Models;
 using AnonymousChatApi.Models.Requests;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Net.Http.Headers;
 
 namespace AnonymousChatApi.Controllers;
 
@@ -23,8 +24,10 @@ public sealed class UserController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
         var accessToken = GetAccessToken(user.Id);
         var refreshToken = GetRefreshToken(user.Id);
         
-        HttpContext.Response.Cookies.Append(Constants.CookieAccessTokenString, accessToken, Options.CookieOptions);
-        HttpContext.Response.Cookies.Append(Constants.CookieRefreshTokenString, refreshToken, Options.CookieOptions);
+        HttpContext.Response.Cookies.Append(Constants.CookieAccessTokenString, accessToken,
+            Options.Cookie(Constants.AccessTokenLifeTime, HttpContext.Request.IsHttps));
+        HttpContext.Response.Cookies.Append(Constants.CookieRefreshTokenString, refreshToken,
+            Options.Cookie(Constants.RefreshTokenLifeTime, HttpContext.Request.IsHttps));
         
         return TypedResults.Ok();
     }
@@ -33,16 +36,23 @@ public sealed class UserController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
     public Results<Ok, BadRequest> RegisterUser([FromBody] RegisterUserRequest request)
     {
         var (login, password) = request;
-        if (db.ContainsUser(login))
+        Console.WriteLine("{0}: {1}", login, password);
+        if (login.Length < 6 || password.Length < 6 || db.ContainsUser(login))
+		{
             return TypedResults.BadRequest();
+		}
             
         var user = db.AddUser(login, password);
 
         var accessToken = GetAccessToken(user.Id);
         var refreshToken = GetRefreshToken(user.Id);
         
-        HttpContext.Response.Cookies.Append(Constants.CookieAccessTokenString, accessToken, Options.CookieOptions);
-        HttpContext.Response.Cookies.Append(Constants.CookieRefreshTokenString, refreshToken, Options.CookieOptions);
+        HttpContext.Response.Cookies.Append(Constants.CookieAccessTokenString, accessToken,
+            Options.Cookie(Constants.AccessTokenLifeTime, HttpContext.Request.IsHttps));
+        HttpContext.Response.Cookies.Append(Constants.CookieRefreshTokenString,
+            refreshToken,
+            Options.Cookie(Constants.RefreshTokenLifeTime, HttpContext.Request.IsHttps));
+
 
         return TypedResults.Ok();
     }
@@ -70,7 +80,8 @@ public sealed class UserController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
 
         var accessToken = GetAccessToken(userIdUlid);
         
-        HttpContext.Response.Cookies.Append(Constants.CookieAccessTokenString, accessToken, Options.CookieOptions);
+        HttpContext.Response.Cookies.Append(Constants.CookieAccessTokenString, accessToken,
+            Options.Cookie(Constants.AccessTokenLifeTime, HttpContext.Request.IsHttps));
         return TypedResults.Ok();
     }
     

@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
 using AnonymousChatApi.Models.Db;
+using AnonymousChatApi.Models.Dtos;
+using AnonymousChatApi.Models.Events;
 using EventHandler = AnonymousChatApi.Services.EventHandler;
 
 namespace AnonymousChatApi.Databases;
@@ -39,7 +41,8 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventHandle
 
         foreach (var chatUserId in users)
         {
-            await handler.OnNewMessageAsync(chatUserId, message.ToDto(), cancellationToken);
+            var @event = new NewMessageEvent(message.ToDto());
+            await handler.OnEventAsync(chatUserId, @event, cancellationToken);
         }
         
         return message;
@@ -105,8 +108,9 @@ public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventHandle
 
         foreach (var user in users)
         {
-            await handler.OnUserJoinAsync(user, chatId, cancellationToken);
-        }
+            var @event = new UserJoinEvent(new UserJoinDto(user, chatId, DateTimeOffset.UtcNow));
+            await handler.OnEventAsync(user, @event, cancellationToken);
+        }   
         
         return users.Add(userId);
     }

@@ -27,24 +27,12 @@ public sealed class EventHandler
             await action(message.EventName, serialized, cancellationToken);
         }
     }
-
-    public async Task OnNewMessageAsync(Ulid userId, ChatMessageDto message, CancellationToken cancellationToken)
+    
+    public async Task OnEventAsync<T>(Ulid userId, T @event, CancellationToken cancellationToken) where T: EventBase
     {
         if (!_eventHandlers.TryGetValue(userId, out var handler))
             return;
 
-        var newMessageEvent = new NewMessageEvent(message);
-
-        await handler.BroadcastEventAsync(newMessageEvent, cancellationToken);
-    }
-
-    public async Task OnUserJoinAsync(Ulid userId, Ulid chatId, CancellationToken cancellationToken)
-    {
-        if (!_eventHandlers.TryGetValue(userId, out var handler))
-            return;
-        
-        var userJoinEvent = new UserJoinEvent(new UserJoinDto(userId, chatId, DateTimeOffset.UtcNow));
-
-        await handler.BroadcastEventAsync(userJoinEvent, cancellationToken);
+        await handler.BroadcastEventAsync(@event, cancellationToken);
     }
 }

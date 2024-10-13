@@ -16,9 +16,12 @@ public static class Options
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    public static CookieOptions CookieOptions { get; } = new()
-    {
-        Secure = true,
-        HttpOnly = true
-    };
+    public static CookieOptions Cookie(TimeSpan lifetime, bool isHttps = false) =>
+        new()
+        {
+            Secure = isHttps,
+            HttpOnly = true,
+            Expires = DateTimeOffset.UtcNow.Add(lifetime),
+            SameSite = isHttps ? SameSiteMode.None : SameSiteMode.Lax
+        };
 }
