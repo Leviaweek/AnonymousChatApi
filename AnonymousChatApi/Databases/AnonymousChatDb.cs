@@ -1,157 +1,215 @@
-using System.Collections.Concurrent;
-using AnonymousChatApi.Models.Db;
+using AnonymousChatApi.Databases.Models;
 using AnonymousChatApi.Models.Dtos;
 using AnonymousChatApi.Models.Events;
+using Microsoft.EntityFrameworkCore;
 using EventHandler = AnonymousChatApi.Services.EventHandler;
 
 namespace AnonymousChatApi.Databases;
 
 //ToDo be sure to replace with ef core
-public sealed class AnonymousChatDb(ILogger<AnonymousChatDb> logger, EventHandler handler)
+public sealed class AnonymousChatDb(
+    ILogger<AnonymousChatDb> logger,
+    EventHandler handler,
+    IDbContextFactory<AnonymousChatDbContext> contextFactory)
 {
-    private readonly Dictionary<Ulid, DbUser> _users = [];
-    private readonly ConcurrentDictionary<Ulid, DbChat> _chats = [];
-    private readonly Dictionary<Ulid, DbChatMessage> _messages = [];
-    
-    private readonly Dictionary<Ulid, HashSet<Ulid>> _chatUsers = [];
-    
-    private readonly ConcurrentDictionary<Ulid, HashSet<Ulid>> _chatMessagesIndex = [];
-    public async Task<DbChatMessage?> AddMessageAsync(DbChatMessage message, CancellationToken cancellationToken)
+    public async ValueTask<MessageDto?> AddTextMessageAsync(MessageDto message, CancellationToken cancellationToken)
     {
-         message = message with { Id = Ulid.NewUlid() };
-
-        if (!_users.TryGetValue(message.SenderId, out var user))
-            return null;
-
-        if (!_chatUsers.TryGetValue(message.ChatId, out var users))
-            return null;
-
-        if (!users.Contains(user.Id))
+        if (message.TextMessage is null)
             return null;
         
-        _messages.Add(message.Id, message);
-        _chatMessagesIndex.AddOrUpdate(message.ChatId, static (_, messageId) => [messageId],
-            static (_, set, messageId) =>
-        { 
-            set.Add(messageId);
-            return set;
-        }, message.Id);
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
         
-        logger.LogInformation("Added message: {message}", message);
+        var user = await db.Users
+            .FirstOrDefaultAsync(user => user.Id == message.SenderId,
+            cancellationToken: cancellationToken);
 
-        foreach (var chatUserId in users)
+        if (user is null)
+            return null;
+        
+        var chat = await db.Chats.Include(chat => chat.ChatUsers)
+            .FirstOrDefaultAsync(chat => chat.Id == message.ChatId,
+            cancellationToken: cancellationToken);
+
+        var userChat = chat?.ChatUsers.FirstOrDefault(x => x.ChatId == message.ChatId);
+        
+        if (chat is null || userChat is null)
+            return null;
+
+        var dbMessage = new MessageBase
         {
-            var @event = new NewMessageEvent(message.ToDto());
-            await handler.OnEventAsync(chatUserId, @event, cancellationToken);
+            ChatId = message.ChatId,
+            TimeStamp = DateTimeOffset.UtcNow,
+            UserId = message.SenderId
+        };
+        var text = new TextMessage
+        {
+            MessageId = message.Id,
+            Text = message.TextMessage.Text,
+        };
+
+        dbMessage.TextMessage = text;
+
+        var result = await db.MessageBases.AddAsync(dbMessage, cancellationToken: cancellationToken);
+
+        message = result.Entity.ToDto();
+        logger.LogInformation("Added message: {message}", message);
+        
+        foreach (var chatUser in chat.ChatUsers)
+        {
+            var @event = new NewMessageEvent(message);
+            await handler.OnEventAsync(chatUser.UserId, @event, cancellationToken);
         }
+
+        await db.SaveChangesAsync(cancellationToken);
         
         return message;
     }
     
-    public List<DbChatMessage>? GetMessages(Ulid chatId, Ulid userId)
+    public async ValueTask<List<MessageDto>?> GetMessages(long chatId,
+        long userId,
+        int offset = 0,
+        int count = 50,
+        CancellationToken cancellationToken = default)
     {
-        if (!_chatUsers.TryGetValue(chatId, out var users))
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+        var user = await db.Users.FirstOrDefaultAsync(user => user.Id == userId,
+            cancellationToken: cancellationToken);
+
+        if (user is null)
             return null;
 
-        if (!users.Contains(userId))
+        var chat = await db.Chats.Include(chat => chat.ChatUsers).Include(chat => chat.Messages)
+            .FirstOrDefaultAsync(chat => chat.Id == chatId,
+                cancellationToken: cancellationToken);
+
+        var chatUser = chat?.ChatUsers.FirstOrDefault(chatUser => chatUser.UserId == user.Id);
+
+        if (chat is null || chatUser is null)
             return null;
 
-        if (!_chats.TryGetValue(chatId, out var chat))
-        {
-            _chatUsers.Remove(chatId);
-            return null;
-        }
+        var messages = chat.Messages.OrderDescending().Skip(offset).Take(count);
 
-        if (!_chatMessagesIndex.TryGetValue(chat.Id, out var messages))
-        {
-            messages = [];
-            _chatMessagesIndex.TryAdd(chat.Id, messages);
-        }
+        var result = messages.Select<MessageBase, MessageDto>(message => message.ToDto()).ToList();
 
-        var resultCollection = new List<DbChatMessage>();
-        foreach (var messageId in messages)
-        {
-            if (!_messages.TryGetValue(messageId, out var message))
-            {
-                _chatMessagesIndex[chatId].Remove(messageId);
-                continue;
-            }
-            resultCollection.Add(message);
-        }
-
-        resultCollection.Sort((previousMessage, currentMessage) => previousMessage.Id.CompareTo(currentMessage.Id));
-
-        return resultCollection;
+        return result;
     }
 
-    public DbChat AddChat(string name)
+    public async ValueTask<ChatDto> AddChatAsync(string name, CancellationToken cancellationToken)
     {
-        var id = Ulid.NewUlid();
-        var chat = new DbChat(id, name, DateTimeOffset.UtcNow);
-        _chats.TryAdd(id, chat);
-        return chat;
-    }
-
-    public async Task<bool> AddUserToChatAsync(Ulid userId, Ulid chatId, CancellationToken cancellationToken)
-    {
-        if (!_users.ContainsKey(userId))
-            return false;
-
-        if (!_chats.ContainsKey(chatId))
-            return false;
-
-        if (!_chatUsers.TryGetValue(chatId, out var users))
-        {
-            users = [];
-            _chatUsers.Add(chatId, users);
-        }
-
-        foreach (var user in users)
-        {
-            var @event = new UserJoinEvent(new UserJoinDto(user, chatId, DateTimeOffset.UtcNow));
-            await handler.OnEventAsync(user, @event, cancellationToken);
-        }   
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
         
-        return users.Add(userId);
+        var chat = new Chat
+        {
+            Name = name,
+            CreatedAt = DateTimeOffset.UtcNow,
+            ChatUsers = [],
+            Messages = []
+        };
+
+        var result = await db.Chats.AddAsync(chat, cancellationToken);
+
+        var dto = result.Entity.ToDto();
+
+        await db.SaveChangesAsync(cancellationToken);
+        return dto;
     }
 
-    public DbUser AddUser(string login, string password)
+    public async ValueTask<bool> AddUserToChatAsync(long userId, long chatId, CancellationToken cancellationToken)
     {
-        var id = Ulid.NewUlid();
-        var user = new DbUser(id, login, password);
-        _users.Add(id, user);
-        return user;
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var user = await db.Users.FirstOrDefaultAsync(user => user.Id == userId, cancellationToken: cancellationToken);
+
+        if (user is null)
+            return false;
+
+        var chat = await db.Chats.Include(chat => chat.ChatUsers)
+            .FirstOrDefaultAsync(chat => chat.Id == chatId,
+                cancellationToken: cancellationToken);
+
+        if (chat is null)
+            return false;
+
+        var chatUser = chat.ChatUsers?.FirstOrDefault(x => x.UserId == user.Id);
+
+        if (chatUser is not null)
+            return false;
+
+        var newChatUser = new ChatUser
+        {
+            ChatId = chat.Id,
+            UserId = user.Id
+        };
+        
+        chat.ChatUsers?.Add(newChatUser);
+
+        foreach (var eventUser in chat.ChatUsers)
+        {
+            var @event = new UserJoinEvent(new UserJoinDto(eventUser.UserId, chatId, DateTimeOffset.UtcNow));
+            await handler.OnEventAsync(eventUser.UserId, @event, cancellationToken);
+        }
+
+        await db.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
-    public bool ContainsUser(string login)
+    public async ValueTask<UserDto?> AddUserAsync(string login, string password, CancellationToken cancellationToken)
     {
-        foreach (var (_, user) in _users)
-            if (user.Login == login)
-                return true;
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
 
-        return false;
+        var dbUser = await db.Users.FirstOrDefaultAsync(user => user.Login == login, cancellationToken: cancellationToken);
+
+        if (dbUser is not null)
+            return null;
+        
+        var user = new User
+        {
+            Login = login,
+            Password = password,
+            TimeStamp = DateTimeOffset.UtcNow,
+            LastReadMessageId = -1,
+        };
+
+        var result = await db.Users.AddAsync(user, cancellationToken: cancellationToken);
+        var dto = result.Entity.ToDto();
+
+        await db.SaveChangesAsync(cancellationToken);
+        return dto;
     }
-    
-    public DbUser? GetUser(string login, string password)
+
+    public async Task<UserDto?> GetUserAsync(string login, string password, CancellationToken cancellationToken)
     {
-        foreach (var (_, user) in _users)
-            if (user.Login == login && user.Password == password)
-                return user;
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
 
-        return null;
+        var user = await db.Users.FirstOrDefaultAsync(user => user.Login == login && user.Password == password,
+            cancellationToken);
+        
+        return user?.ToDto();
     }
 
-    public DbChat GetRandomChat()
+    public async ValueTask<ChatDto> GetRandomChatAsync(CancellationToken cancellationToken)
     {
         var random = new Random();
-        if (_chats.IsEmpty)
+
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var count = db.Chats.Count();
+        
+        if (count is 0)
         {
-            return AddChat("RandomChat");
+            return await AddChatAsync("RandomChat", cancellationToken);
         }
-        var chatIndex = random.Next(_chats.Count);
-        var chat = _chats.Values.Skip(chatIndex).First();
-        return chat;
+        var chatIndex = random.Next(count);
+        var chat = db.Chats.Skip(chatIndex).First();
+        return chat.ToDto();
     }
 
-    public DbUser? GetUserById(Ulid id) => _users.GetValueOrDefault(id);
+    public async ValueTask<UserDto?> GetUserByIdAsync(long id, CancellationToken cancellationToken)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var user = await db.Users.FirstOrDefaultAsync(user => user.Id == id, cancellationToken: cancellationToken);
+
+        return user?.ToDto();
+    }
 }

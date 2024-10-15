@@ -22,11 +22,11 @@ public sealed class ServerSentEventController(
         if (userIdString is null || lifeTimeString is null || createdAtString is null)
             return TypedResults.NotFound();
 
-        var ulidId = Ulid.Parse(userIdString);
+        var userId = long.Parse(userIdString);
         var lifeTime = TimeSpan.Parse(lifeTimeString);
         var createdAt = DateTimeOffset.Parse(createdAtString);
         
-        var user = db.GetUserById(ulidId);
+        var user = await db.GetUserByIdAsync(userId, cancellationToken);
         
         if (user is null)
             return TypedResults.NotFound();
@@ -48,7 +48,7 @@ public sealed class ServerSentEventController(
 
         try
         {
-            var task = handler.SubscribeOnEventAsync(ulidId, EventActionAsync, linkedSource.Token);
+            var task = handler.SubscribeOnEventAsync(userId, EventActionAsync, linkedSource.Token);
 
             await task;
         }

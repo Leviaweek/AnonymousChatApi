@@ -11,7 +11,8 @@ namespace AnonymousChatApi.Controllers;
 public sealed class MessageController(AnonymousChatDb anonymousChatDb): ControllerBase
 {
     [HttpGet("get-messages")]
-    public Results<Ok<List<ChatMessageDto>>, NotFound> GetMessages([FromBody]GetMessagesRequest request)
+    public async Task<Results<Ok<List<MessageDto>>, NotFound>> GetMessagesAsync([FromBody] GetMessagesRequest request,
+        CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
         var lifeTime = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
@@ -19,15 +20,20 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb): Controll
         if (userId is null || lifeTime is null)
             return TypedResults.NotFound();
 
-        var ulidId = Ulid.Parse(userId);
-        var messages = anonymousChatDb.GetMessages(request.ChatId, ulidId);
+        var userIdLong = long.Parse(userId);
+        
+        var messages = await anonymousChatDb.GetMessages(request.ChatId,
+            userIdLong,
+            cancellationToken: cancellationToken);
+        
         if (messages is null)
             return TypedResults.NotFound();
-        return TypedResults.Ok(messages.Select(x => x.ToDto()).ToList());
+        
+        return TypedResults.Ok(messages);
     }
 
     [HttpPost]
-    public async Task<Results<Ok<ChatMessageDto>, BadRequest>> SendMessageAsync([FromBody] ChatMessageDto message,
+    public async Task<Results<Ok<MessageDto>, BadRequest>> SendMessageAsync([FromBody] MessageDto message,
         CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
@@ -36,15 +42,16 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb): Controll
         if (userId is null || lifeTime is null)
             return TypedResults.BadRequest();
 
-        var ulidId = Ulid.Parse(userId);
+        var userIdLong = long.Parse(userId);
 
-        var dbMessage = message.ToDb(ulidId);
-        
-        dbMessage = await anonymousChatDb.AddMessageAsync(dbMessage, cancellationToken);
-        
-        if (dbMessage is null)
+        if (message.Id != userIdLong)
             return TypedResults.BadRequest();
         
-        return TypedResults.Ok(dbMessage.ToDto());
+        var resultMessage = await anonymousChatDb.AddTextMessageAsync(message, cancellationToken);
+        
+        if (resultMessage is null)
+            return TypedResults.BadRequest();
+        
+        return TypedResults.Ok(resultMessage);
     }
 }

@@ -8,9 +8,9 @@ namespace AnonymousChatApi.Services;
 
 public sealed class EventHandler
 {
-    private readonly ConcurrentDictionary<Ulid, UserEventHandler<EventBase>> _eventHandlers = [];
+    private readonly ConcurrentDictionary<long, UserEventHandler<EventBase>> _eventHandlers = [];
     
-    public async Task SubscribeOnEventAsync(Ulid userId,
+    public async Task SubscribeOnEventAsync(long userId,
         Func<string, string, CancellationToken, Task> action, CancellationToken cancellationToken)
     {
         if (!_eventHandlers.TryGetValue(userId, out var eventHandler))
@@ -28,7 +28,7 @@ public sealed class EventHandler
         }
     }
     
-    public async Task OnEventAsync<T>(Ulid userId, T @event, CancellationToken cancellationToken) where T: EventBase
+    public async Task OnEventAsync<T>(long userId, T @event, CancellationToken cancellationToken) where T: EventBase
     {
         if (!_eventHandlers.TryGetValue(userId, out var handler))
             return;

@@ -2,10 +2,10 @@ using System.Security.Claims;
 using AnonymousChatApi.Databases;
 using AnonymousChatApi.Jwt;
 using AnonymousChatApi.Models;
+using AnonymousChatApi.Models.Dtos;
 using AnonymousChatApi.Models.Requests;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Net.Http.Headers;
 
 namespace AnonymousChatApi.Controllers;
 
@@ -13,10 +13,11 @@ namespace AnonymousChatApi.Controllers;
 public sealed class UserController(AnonymousChatDb db, Jwt<JwtPayload> jwt): ControllerBase
 {
     [HttpPost("login")]
-    public Results<Ok, NotFound> LoginUser([FromBody] LoginUserRequest request)
+    public async Task<Results<Ok<UserDto>, NotFound>> LoginUserAsync([FromBody] LoginUserRequest request,
+        CancellationToken cancellationToken)
     {
         var (login, password) = request;
-        var user = db.GetUser(login, password);
+        var user = await db.GetUserAsync(login, password, cancellationToken);
         
         if (user is null)
             return TypedResults.NotFound();
@@ -29,21 +30,24 @@ public sealed class UserController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
         HttpContext.Response.Cookies.Append(Constants.CookieRefreshTokenString, refreshToken,
             Options.Cookie(Constants.RefreshTokenLifeTime, HttpContext.Request.IsHttps));
         
-        return TypedResults.Ok();
+        return TypedResults.Ok(user);
     }
 
     [HttpPost("register")]
-    public Results<Ok, BadRequest> RegisterUser([FromBody] RegisterUserRequest request)
+    public async Task<Results<Ok<UserDto>, BadRequest>> RegisterUserAsync([FromBody] RegisterUserRequest request,
+        CancellationToken cancellationToken)
     {
         var (login, password) = request;
-        Console.WriteLine("{0}: {1}", login, password);
-        if (login.Length < 6 || password.Length < 6 || db.ContainsUser(login))
+        if (login.Length < 6 || password.Length < 6)
 		{
             return TypedResults.BadRequest();
 		}
             
-        var user = db.AddUser(login, password);
+        var user = await db.AddUserAsync(login, password, cancellationToken);
 
+        if (user is null)
+            return TypedResults.BadRequest();
+        
         var accessToken = GetAccessToken(user.Id);
         var refreshToken = GetRefreshToken(user.Id);
         
@@ -54,11 +58,11 @@ public sealed class UserController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
             Options.Cookie(Constants.RefreshTokenLifeTime, HttpContext.Request.IsHttps));
 
 
-        return TypedResults.Ok();
+        return TypedResults.Ok(user);
     }
 
     [HttpPost("refresh-access-token")]
-    public Results<Ok, BadRequest> RefreshAccessToken()
+    public async Task<Results<Ok, BadRequest>> RefreshAccessTokenAsync(CancellationToken cancellationToken)
     {
         var hasRefreshTokenValue = User.FindFirstValue(Constants.JwtHasRefreshTokenType);
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
@@ -71,28 +75,28 @@ public sealed class UserController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
         if (!hasRefreshToken)
             return TypedResults.BadRequest();
 
-        var userIdUlid = Ulid.Parse(userId);
+        var userIdLong = long.Parse(userId);
 
-        var user = db.GetUserById(userIdUlid);
+        var user = await db.GetUserByIdAsync(userIdLong, cancellationToken);
 
         if (user is null)
             return TypedResults.BadRequest();
 
-        var accessToken = GetAccessToken(userIdUlid);
+        var accessToken = GetAccessToken(userIdLong);
         
         HttpContext.Response.Cookies.Append(Constants.CookieAccessTokenString, accessToken,
             Options.Cookie(Constants.AccessTokenLifeTime, HttpContext.Request.IsHttps));
         return TypedResults.Ok();
     }
     
-    private string GetAccessToken(Ulid id)
+    private string GetAccessToken(long id)
     {
         var payload = new JwtPayload(id, DateTimeOffset.UtcNow, Constants.AccessTokenLifeTime);
         var token = jwt.CreateToken(payload);
         return token;
     }
 
-    private string GetRefreshToken(Ulid id)
+    private string GetRefreshToken(long id)
     {
         var payload = new JwtPayload(id, DateTimeOffset.UtcNow, Constants.RefreshTokenLifeTime, true);
         var token = jwt.CreateToken(payload);

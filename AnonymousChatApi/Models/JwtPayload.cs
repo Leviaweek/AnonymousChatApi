@@ -5,10 +5,10 @@ using Microsoft.IdentityModel.Tokens;
 namespace AnonymousChatApi.Models;
 
 [Serializable]
-public sealed class JwtPayload(Ulid userId, DateTimeOffset createdAt, TimeSpan lifeTime, bool isRefreshToken = false): IJwtPayload
+public sealed class JwtPayload(long userId, DateTimeOffset createdAt, TimeSpan lifeTime, bool isRefreshToken = false): IJwtPayload
 {
 
-    public Ulid UserId { get; } = userId;
+    public long UserId { get; } = userId;
     public DateTimeOffset CreatedAt { get; } = createdAt;
     public TimeSpan LifeTime { get; } = lifeTime;
     public bool IsRefreshToken { get; } = isRefreshToken;

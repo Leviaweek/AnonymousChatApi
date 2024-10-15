@@ -1,4 +1,4 @@
 namespace AnonymousChatApi.Models.Requests;
 
 [Serializable]
-public sealed record GetMessagesRequest(Ulid ChatId);
+public sealed record GetMessagesRequest(long ChatId);

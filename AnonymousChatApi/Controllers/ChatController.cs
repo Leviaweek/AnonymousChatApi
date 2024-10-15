@@ -11,16 +11,21 @@ namespace AnonymousChatApi.Controllers;
 public sealed class ChatController(AnonymousChatDb db): ControllerBase
 {
     [HttpPost("create")]
-    public Results<Ok<ChatDto>, NotFound> CreateChat([FromBody] CreateChatRequest request)
+    public async Task<Results<Ok<ChatDto>, NotFound>> CreateChatAsync([FromBody] CreateChatRequest request, CancellationToken cancellationToken)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
         var lifeTime = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
 
         if (userId is null || lifeTime is null)
             return TypedResults.NotFound();
+
+        var userIdLong = long.Parse(userId);
+
+        if (userIdLong != request.UserId)
+            return TypedResults.NotFound();
         
-        var chat = db.AddChat(request.Name);
-        return TypedResults.Ok(chat.ToDto());
+        var chat = await db.AddChatAsync(request.Name, cancellationToken);
+        return TypedResults.Ok(chat);
     }
 
     [HttpPost("join")]
@@ -32,9 +37,12 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
         if (userId is null || lifeTime is null)
             return TypedResults.BadRequest();
 
-        var ulidId = Ulid.Parse(userId);
+        var userIdLong = long.Parse(userId);
+
+        if (userIdLong != request.UserId)
+            return TypedResults.BadRequest();
         
-        var result = await db.AddUserToChatAsync(ulidId, request.ChatId, cancellationToken);
+        var result = await db.AddUserToChatAsync(userIdLong, request.ChatId, cancellationToken);
         
         if (!result)
             return TypedResults.BadRequest();
@@ -51,15 +59,15 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
         if (userId is null || lifeTime is null)
             return TypedResults.NotFound();
 
-        var ulidId = Ulid.Parse(userId);
+        var userIdLong = long.Parse(userId);
         
-        var chat = db.GetRandomChat();
+        var chat = await db.GetRandomChatAsync(cancellationToken);
 
-        var result = await db.AddUserToChatAsync(ulidId, chat.Id, cancellationToken);
+        var result = await db.AddUserToChatAsync(userIdLong, chat.Id, cancellationToken);
 
         if (!result)
             return TypedResults.NotFound();
         
-        return TypedResults.Ok(chat.ToDto());
+        return TypedResults.Ok(chat);
     }
 }

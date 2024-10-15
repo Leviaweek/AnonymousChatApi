@@ -3,9 +3,9 @@ using AnonymousChatApi.Models.Dtos;
 
 namespace AnonymousChatApi.Models.Events;
 
-public sealed class NewMessageEvent(ChatMessageDto body)
-    : EventBase, IEvent<ChatMessageDto>
+public sealed class NewMessageEvent(MessageDto body)
+    : EventBase, IEvent<MessageDto>
 {
-    public ChatMessageDto Body { get; } = body;
+    public MessageDto Body { get; } = body;
     public override string EventName => "new-message";
 }
