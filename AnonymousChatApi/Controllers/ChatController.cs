@@ -61,7 +61,7 @@ public sealed class ChatController(AnonymousChatDb db): ControllerBase
 
         var userIdLong = long.Parse(userId);
         
-        var chat = await db.GetRandomChatAsync(cancellationToken);
+        var chat = await db.GetRandomChatAsync(userIdLong, cancellationToken);
 
         var result = await db.AddUserToChatAsync(userIdLong, chat.Id, cancellationToken);
 

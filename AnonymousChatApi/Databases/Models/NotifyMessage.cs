@@ -7,7 +7,7 @@ namespace AnonymousChatApi.Databases.Models;
 [Table("NotifyMessages", Schema = AnonymousChatDbContext.PublicSchema)]
 public class NotifyMessage
 {
-    [Key] public required int MessageId { get; set; }
+    [Key] public required long MessageId { get; set; }
     
     public required NotifyType Type { get; set; }
 }

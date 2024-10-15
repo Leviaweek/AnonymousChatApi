@@ -43,8 +43,8 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb): Controll
             return TypedResults.BadRequest();
 
         var userIdLong = long.Parse(userId);
-
-        if (message.Id != userIdLong)
+        
+        if (message.SenderId != userIdLong)
             return TypedResults.BadRequest();
         
         var resultMessage = await anonymousChatDb.AddTextMessageAsync(message, cancellationToken);

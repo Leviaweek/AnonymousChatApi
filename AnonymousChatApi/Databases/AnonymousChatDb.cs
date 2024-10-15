@@ -43,7 +43,6 @@ public sealed class AnonymousChatDb(
         };
         var text = new TextMessage
         {
-            MessageId = message.Id,
             Text = message.TextMessage.Text,
         };
 
@@ -51,6 +50,7 @@ public sealed class AnonymousChatDb(
 
         var result = await db.MessageBases.AddAsync(dbMessage, cancellationToken: cancellationToken);
 
+        await db.SaveChangesAsync(cancellationToken);
         message = result.Entity.ToDto();
         logger.LogInformation("Added message: {message}", message);
         
@@ -60,7 +60,6 @@ public sealed class AnonymousChatDb(
             await handler.OnEventAsync(chatUser.UserId, @event, cancellationToken);
         }
 
-        await db.SaveChangesAsync(cancellationToken);
         
         return message;
     }
@@ -87,9 +86,9 @@ public sealed class AnonymousChatDb(
         if (chat is null || chatUser is null)
             return null;
 
-        var messages = chat.Messages.OrderDescending().Skip(offset).Take(count);
+        var messages = chat.Messages.OrderByDescending(m => m.Id).Skip(offset).Take(count);
 
-        var result = messages.Select<MessageBase, MessageDto>(message => message.ToDto()).ToList();
+        var result = messages.Select(message => message.ToDto()).ToList();
 
         return result;
     }
@@ -107,10 +106,10 @@ public sealed class AnonymousChatDb(
         };
 
         var result = await db.Chats.AddAsync(chat, cancellationToken);
+        await db.SaveChangesAsync(cancellationToken);
 
         var dto = result.Entity.ToDto();
 
-        await db.SaveChangesAsync(cancellationToken);
         return dto;
     }
 
@@ -123,14 +122,16 @@ public sealed class AnonymousChatDb(
         if (user is null)
             return false;
 
-        var chat = await db.Chats.Include(chat => chat.ChatUsers)
+        var chat = await db.Chats
+            .Include(chat => chat.ChatUsers)
+            .AsSingleQuery()
             .FirstOrDefaultAsync(chat => chat.Id == chatId,
                 cancellationToken: cancellationToken);
 
         if (chat is null)
             return false;
 
-        var chatUser = chat.ChatUsers?.FirstOrDefault(x => x.UserId == user.Id);
+        var chatUser = chat.ChatUsers.FirstOrDefault(x => x.UserId == user.Id);
 
         if (chatUser is not null)
             return false;
@@ -141,7 +142,8 @@ public sealed class AnonymousChatDb(
             UserId = user.Id
         };
         
-        chat.ChatUsers?.Add(newChatUser);
+        chat.ChatUsers.Add(newChatUser);
+        await db.SaveChangesAsync(cancellationToken);
 
         foreach (var eventUser in chat.ChatUsers)
         {
@@ -149,7 +151,6 @@ public sealed class AnonymousChatDb(
             await handler.OnEventAsync(eventUser.UserId, @event, cancellationToken);
         }
 
-        await db.SaveChangesAsync(cancellationToken);
         return true;
     }
 
@@ -171,9 +172,9 @@ public sealed class AnonymousChatDb(
         };
 
         var result = await db.Users.AddAsync(user, cancellationToken: cancellationToken);
-        var dto = result.Entity.ToDto();
-
         await db.SaveChangesAsync(cancellationToken);
+        
+        var dto = result.Entity.ToDto();
         return dto;
     }
 
@@ -187,20 +188,25 @@ public sealed class AnonymousChatDb(
         return user?.ToDto();
     }
 
-    public async ValueTask<ChatDto> GetRandomChatAsync(CancellationToken cancellationToken)
+    public async ValueTask<ChatDto> GetRandomChatAsync(long userId, CancellationToken cancellationToken)
     {
         var random = new Random();
 
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
 
-        var count = db.Chats.Count();
+        var chatsWithoutUser = db.ChatUsers.Where(chatUser => chatUser.UserId != userId);
+        
+        var count = await chatsWithoutUser.CountAsync(cancellationToken: cancellationToken);
         
         if (count is 0)
         {
             return await AddChatAsync("RandomChat", cancellationToken);
         }
         var chatIndex = random.Next(count);
-        var chat = db.Chats.Skip(chatIndex).First();
+        var chat = chatsWithoutUser.Skip(chatIndex).First().Chat;
+        
+        ArgumentNullException.ThrowIfNull(chat);
+        
         return chat.ToDto();
     }
 

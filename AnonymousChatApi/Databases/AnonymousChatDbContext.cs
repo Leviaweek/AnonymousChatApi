@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AnonymousChatApi.Databases;
 
 [Serializable]
-public class AnonymousChatDbContext: DbContext
+public class AnonymousChatDbContext(DbContextOptions<AnonymousChatDbContext> options): DbContext(options)
 {
     public const string PublicSchema = "public";
     

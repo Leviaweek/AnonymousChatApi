@@ -1,9 +1,10 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using AnonymousChatApi;
 using AnonymousChatApi.Databases;
 using AnonymousChatApi.Jwt;
 using AnonymousChatApi.Models;
-using Cysharp.Serialization.Json;
+using Microsoft.EntityFrameworkCore;
 using EventHandler = AnonymousChatApi.Services.EventHandler;
 
 
@@ -24,11 +25,14 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddControllers();
 
+builder.Services.AddDbContextFactory<AnonymousChatDbContext>(optionsBuilder => 
+    optionsBuilder.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
+
 builder.Services.AddSingleton<AnonymousChatDb>();
 builder.Services.ConfigureHttpJsonOptions(options =>
 {
-    options.SerializerOptions.Converters.Add(new UlidJsonConverter());
     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    options.SerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 });
 builder.Services.AddSingleton<EventHandler>();
 

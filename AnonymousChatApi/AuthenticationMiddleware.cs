@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using System.Text.Json;
 using AnonymousChatApi.Jwt;
 using AnonymousChatApi.Models;
 
@@ -19,39 +20,47 @@ public class AuthenticationMiddleware
     {
         if (context.Request.Cookies.TryGetValue(Constants.CookieAccessTokenString, out var token))
         {
-            if (_jwt.IsValid(token))
+            try
             {
-                var payload = JwtPayload.FromToken(token);
-                
-                List<Claim> claims = [
-                    new(Constants.JwtUserIdClaimType, payload.UserId.ToString()),
-                    new(Constants.JwtLifeTimeClaimType, payload.LifeTime.ToString()),
-                    new(Constants.JwtCreatedAtClaimType, payload.CreatedAt.ToString()),
-                ];
-        
-                var identity = new ClaimsIdentity(claims);
+                if (_jwt.IsValid(token))
+                {
+                    var payload = JwtPayload.FromToken(token);
 
-                context.User.AddIdentity(identity);
+                    List<Claim> claims =
+                    [
+                        new(Constants.JwtUserIdClaimType, payload.UserId.ToString()),
+                        new(Constants.JwtLifeTimeClaimType, payload.LifeTime.ToString()),
+                        new(Constants.JwtCreatedAtClaimType, payload.CreatedAt.ToString()),
+                    ];
+
+                    var identity = new ClaimsIdentity(claims);
+
+                    context.User.AddIdentity(identity);
+                }
+
+
+                if (context.Request.Cookies.TryGetValue(Constants.CookieRefreshTokenString, out token))
+                {
+                    if (_jwt.IsValid(token))
+                    {
+                        var payload = JwtPayload.FromToken(token);
+
+                        List<Claim> claims =
+                        [
+                            new(Constants.JwtUserIdClaimType, payload.UserId.ToString()),
+                            new(Constants.JwtHasRefreshTokenType, true.ToString())
+                        ];
+
+                        var identity = new ClaimsIdentity(claims);
+
+                        context.User.AddIdentity(identity);
+                    }
+                }
             }
+            catch (JsonException)
+            { }
         }
 
-        if (context.Request.Cookies.TryGetValue(Constants.CookieRefreshTokenString, out token))
-        {
-            if (_jwt.IsValid(token))
-            {
-                var payload = JwtPayload.FromToken(token);
-                
-                List<Claim> claims =
-                [
-                    new(Constants.JwtUserIdClaimType, payload.UserId.ToString()),
-                    new(Constants.JwtHasRefreshTokenType, true.ToString())
-                ];
-
-                var identity = new ClaimsIdentity(claims);
-                
-                context.User.AddIdentity(identity);
-            }
-        }
         await _next(context);
     }
 }

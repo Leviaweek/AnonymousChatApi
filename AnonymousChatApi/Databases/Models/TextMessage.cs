@@ -8,7 +8,7 @@ namespace AnonymousChatApi.Databases.Models;
 public class TextMessage
 {
     
-    [Key] public required long MessageId { get; set; }
+    [Key] public long MessageId { get; set; }
     
     public required string Text { get; set; }   
 }

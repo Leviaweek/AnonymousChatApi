@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 namespace AnonymousChatApi.Databases.Models;
 
 [Serializable]
-[Table("ChatUsers", Schema = AnonymousChatDbContext.PublicSchema)]
+[Table("Users", Schema = AnonymousChatDbContext.PublicSchema)]
 [Index(nameof(Id), IsUnique = true)]
 public sealed class User
 {
