@@ -14,7 +14,7 @@ public sealed record Chat
     [MaxLength(50)]
     public required string Name { get; set; }
     public required DateTimeOffset CreatedAt { get; set; }
-    
+    public required bool IsDeleted { get; set; }
     public required List<ChatUser> ChatUsers { get; set; }
     public required List<MessageBase> Messages { get; set; }
 }

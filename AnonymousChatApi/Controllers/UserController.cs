@@ -68,19 +68,28 @@ public sealed class UserController(AnonymousChatDb db, Jwt<JwtPayload> jwt): Con
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
         
         if (hasRefreshTokenValue is null || userId is null)
+        {
+            Console.WriteLine(hasRefreshTokenValue is null);
             return TypedResults.BadRequest();
+        }
 
         var hasRefreshToken = bool.Parse(hasRefreshTokenValue);
 
         if (!hasRefreshToken)
+        {
+            Console.WriteLine("not refesh token");
             return TypedResults.BadRequest();
+        }
 
         var userIdLong = long.Parse(userId);
 
         var user = await db.GetUserByIdAsync(userIdLong, cancellationToken);
 
         if (user is null)
+        {
+            Console.WriteLine("Not user in db");
             return TypedResults.BadRequest();
+        }
 
         var accessToken = GetAccessToken(userIdLong);
         

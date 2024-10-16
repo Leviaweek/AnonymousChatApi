@@ -2,6 +2,7 @@ using AnonymousChatApi.Databases.Models;
 using AnonymousChatApi.Models.Dtos;
 using AnonymousChatApi.Models.Events;
 using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using EventHandler = AnonymousChatApi.Services.EventHandler;
 
 namespace AnonymousChatApi.Databases;
@@ -39,14 +40,13 @@ public sealed class AnonymousChatDb(
         {
             ChatId = message.ChatId,
             TimeStamp = DateTimeOffset.UtcNow,
-            UserId = message.SenderId
+            UserId = message.SenderId,
+            TextMessage =
+            {
+                Text = message.TextMessage!.Text
+            },
+            IsDeleted = false
         };
-        var text = new TextMessage
-        {
-            Text = message.TextMessage.Text,
-        };
-
-        dbMessage.TextMessage = text;
 
         var result = await db.MessageBases.AddAsync(dbMessage, cancellationToken: cancellationToken);
 
@@ -59,7 +59,6 @@ public sealed class AnonymousChatDb(
             var @event = new NewMessageEvent(message);
             await handler.OnEventAsync(chatUser.UserId, @event, cancellationToken);
         }
-
         
         return message;
     }
@@ -71,26 +70,26 @@ public sealed class AnonymousChatDb(
         CancellationToken cancellationToken = default)
     {
         await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
-        var user = await db.Users.FirstOrDefaultAsync(user => user.Id == userId,
+        
+        var chatUser = await db.ChatUsers.FirstOrDefaultAsync(
+            chatUser => chatUser.UserId == userId && chatUser.ChatId == chatId,
             cancellationToken: cancellationToken);
 
-        if (user is null)
+        if (chatUser is null)
             return null;
+        
+        var messages = await db.MessageBases
+            .Where(m => m.ChatId == chatId)
+            .OrderByDescending(m => m.Id)
+            .Skip(offset)
+            .Take(count)
+            .Include(m => m.TextMessage)
+            .Include(m => m.NotifyMessage)
+            .AsSingleQuery()
+            .Select(message => message.ToDto())
+            .ToListAsync(cancellationToken: cancellationToken);
 
-        var chat = await db.Chats.Include(chat => chat.ChatUsers).Include(chat => chat.Messages)
-            .FirstOrDefaultAsync(chat => chat.Id == chatId,
-                cancellationToken: cancellationToken);
-
-        var chatUser = chat?.ChatUsers.FirstOrDefault(chatUser => chatUser.UserId == user.Id);
-
-        if (chat is null || chatUser is null)
-            return null;
-
-        var messages = chat.Messages.OrderByDescending(m => m.Id).Skip(offset).Take(count);
-
-        var result = messages.Select(message => message.ToDto()).ToList();
-
-        return result;
+        return messages;
     }
 
     public async ValueTask<ChatDto> AddChatAsync(string name, CancellationToken cancellationToken)
@@ -102,7 +101,8 @@ public sealed class AnonymousChatDb(
             Name = name,
             CreatedAt = DateTimeOffset.UtcNow,
             ChatUsers = [],
-            Messages = []
+            Messages = [],
+            IsDeleted = false
         };
 
         var result = await db.Chats.AddAsync(chat, cancellationToken);
@@ -139,7 +139,10 @@ public sealed class AnonymousChatDb(
         var newChatUser = new ChatUser
         {
             ChatId = chat.Id,
-            UserId = user.Id
+            UserId = user.Id,
+            LastReadMessageId = null,
+            User = user,
+            Chat = chat
         };
         
         chat.ChatUsers.Add(newChatUser);
@@ -167,8 +170,7 @@ public sealed class AnonymousChatDb(
         {
             Login = login,
             Password = password,
-            TimeStamp = DateTimeOffset.UtcNow,
-            LastReadMessageId = -1,
+            TimeStamp = DateTimeOffset.UtcNow
         };
 
         var result = await db.Users.AddAsync(user, cancellationToken: cancellationToken);
@@ -217,5 +219,21 @@ public sealed class AnonymousChatDb(
         var user = await db.Users.FirstOrDefaultAsync(user => user.Id == id, cancellationToken: cancellationToken);
 
         return user?.ToDto();
+    }
+
+    public async ValueTask<bool> TryReadMessagesAsync(long userId, long chatId, long lastReadId, CancellationToken cancellationToken)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var result = await db.ChatUsers
+            .Where(user => user.UserId == userId)
+            .Where(user => user.ChatId == chatId)
+            .Where(user => !user.Chat.IsDeleted)
+            .Where(user => user.LastReadMessageId == null || user.LastReadMessageId > lastReadId)
+            .Where(user => user.Chat.Messages.Any(m => m.Id == lastReadId))
+            .ExecuteUpdateAsync(u => u.SetProperty(c => c.LastReadMessageId, lastReadId),
+                cancellationToken);
+
+        return result == 1;
     }
 }

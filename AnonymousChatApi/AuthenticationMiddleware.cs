@@ -18,9 +18,9 @@ public class AuthenticationMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        if (context.Request.Cookies.TryGetValue(Constants.CookieAccessTokenString, out var token))
+        try
         {
-            try
+            if (context.Request.Cookies.TryGetValue(Constants.CookieAccessTokenString, out var token))
             {
                 if (_jwt.IsValid(token))
                 {
@@ -38,28 +38,29 @@ public class AuthenticationMiddleware
                     context.User.AddIdentity(identity);
                 }
 
+            }
 
-                if (context.Request.Cookies.TryGetValue(Constants.CookieRefreshTokenString, out token))
+            if (context.Request.Cookies.TryGetValue(Constants.CookieRefreshTokenString, out token))
+            {
+                if (_jwt.IsValid(token))
                 {
-                    if (_jwt.IsValid(token))
-                    {
-                        var payload = JwtPayload.FromToken(token);
+                    Console.WriteLine("refresh valid");
+                    var payload = JwtPayload.FromToken(token);
 
-                        List<Claim> claims =
-                        [
-                            new(Constants.JwtUserIdClaimType, payload.UserId.ToString()),
-                            new(Constants.JwtHasRefreshTokenType, true.ToString())
-                        ];
+                    List<Claim> claims =
+                    [
+                        new(Constants.JwtUserIdClaimType, payload.UserId.ToString()),
+                        new(Constants.JwtHasRefreshTokenType, true.ToString())
+                    ];
 
-                        var identity = new ClaimsIdentity(claims);
+                    var identity = new ClaimsIdentity(claims);
 
-                        context.User.AddIdentity(identity);
-                    }
+                    context.User.AddIdentity(identity);
                 }
             }
-            catch (JsonException)
-            { }
         }
+        catch (JsonException)
+        { }
 
         await _next(context);
     }

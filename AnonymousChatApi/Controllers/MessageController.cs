@@ -54,4 +54,31 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb): Controll
         
         return TypedResults.Ok(resultMessage);
     }
+
+    [HttpPost("read")]
+    public async Task<Results<Ok, BadRequest>> ReadMessagesAsync([FromBody] ReadMessagesRequest request,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+        var lifeTime = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
+
+        if (userId is null || lifeTime is null)
+            return TypedResults.BadRequest();
+
+        var userIdLong = long.Parse(userId);
+        
+        if (request.UserId != userIdLong)
+        {
+            Console.WriteLine(request);
+            return TypedResults.BadRequest();
+        }
+
+        var result = await anonymousChatDb.TryReadMessagesAsync(request.UserId, request.ChatId,
+            request.LastReadMessageId, cancellationToken);
+
+        if (!result)
+            return TypedResults.BadRequest();
+
+        return TypedResults.Ok();
+    }
 }

@@ -13,7 +13,7 @@ public sealed class MessageBase
     public required long ChatId { get; set; }
     public long Id { get; set; }
     public required DateTimeOffset TimeStamp { get; set; }
-
+    public required bool IsDeleted { get; set; }
     public TextMessage? TextMessage { get; set; }
     public NotifyMessage? NotifyMessage { get; set; }
 

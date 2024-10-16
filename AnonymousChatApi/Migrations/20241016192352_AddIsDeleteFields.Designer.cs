@@ -3,6 +3,7 @@ using System;
 using AnonymousChatApi.Databases;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace AnonymousChatApi.Migrations
 {
     [DbContext(typeof(AnonymousChatDbContext))]
-    partial class AnonymousChatDbContextModelSnapshot : ModelSnapshot
+    [Migration("20241016192352_AddIsDeleteFields")]
+    partial class AddIsDeleteFields
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
