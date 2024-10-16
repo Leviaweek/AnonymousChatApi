@@ -16,7 +16,4 @@ public sealed class User
     [StringLength(maximumLength: 50, MinimumLength = 6)]
     public required string Password { get; set; }
     public required DateTimeOffset TimeStamp { get; set; }
-    public required long LastReadMessageId { get; set; }
-
-    public List<ChatUser>? ChatUsers { get; set; }
 }

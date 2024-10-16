@@ -11,8 +11,10 @@ public sealed record ChatUser
 {
     public required long UserId { get; set; }
     public required long ChatId { get; set; }
+    public required long? LastReadMessageId { get; set; }
 
-    public Chat? Chat { get; set; }
+    public required Chat Chat { get; set; }
+    public required User User { get; set; }
 }
 
 file sealed class ChatUserConfigure: IEntityTypeConfiguration<ChatUser>
@@ -22,13 +24,18 @@ file sealed class ChatUserConfigure: IEntityTypeConfiguration<ChatUser>
         builder.HasKey(cu => new { cu.UserId, cu.ChatId });
 
         builder.HasOne(x => x.Chat)
-            .WithMany(c => c.ChatUsers)
+            .WithMany(x => x.ChatUsers)
             .HasForeignKey(cu => cu.ChatId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        builder.HasOne<User>()
-            .WithMany(c => c.ChatUsers)
+        builder.HasOne(x => x.User)
+            .WithMany()
             .HasForeignKey(cu => cu.UserId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne<MessageBase>()
+            .WithMany()
+            .HasForeignKey(m => m.LastReadMessageId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }
