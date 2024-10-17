@@ -11,8 +11,12 @@ namespace AnonymousChatApi.Controllers;
 public sealed class MessageController(AnonymousChatDb anonymousChatDb): ControllerBase
 {
     [HttpGet("get-messages")]
-    public async Task<Results<Ok<List<MessageDto>>, NotFound>> GetMessagesAsync([FromBody] GetMessagesRequest request,
-        CancellationToken cancellationToken)
+    public async Task<Results<Ok<List<MessageDto>>, NotFound>> GetMessagesAsync(
+        [FromQuery] long chatId,
+        [FromQuery] long countFrom,
+        [FromQuery] string sortingType,
+        CancellationToken cancellationToken,
+        [FromQuery] int count = 50)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
         var lifeTime = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
@@ -20,11 +24,28 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb): Controll
         if (userId is null || lifeTime is null)
             return TypedResults.NotFound();
 
+        bool isAsc;
+
+        switch (sortingType)
+        {
+            case "asc":
+                isAsc = true;
+                break;
+            case "desc":
+                isAsc = false;
+                break;
+            default:
+                return TypedResults.NotFound();
+        }
+        
         var userIdLong = long.Parse(userId);
         
-        var messages = await anonymousChatDb.GetMessages(request.ChatId,
+        var messages = await anonymousChatDb.GetMessages(chatId,
             userIdLong,
-            cancellationToken: cancellationToken);
+            countFrom,
+            isAsc,
+            count,
+            cancellationToken);
         
         if (messages is null)
             return TypedResults.NotFound();
@@ -80,5 +101,23 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb): Controll
             return TypedResults.BadRequest();
 
         return TypedResults.Ok();
+    }
+
+    [HttpGet("updates")]
+    public async Task<Results<Ok<int>, NotFound>> GetUpdatesCountAsync([FromQuery] long chatId,
+        CancellationToken cancellationToken)
+    {
+        var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);
+        var lifeTime = User.FindFirstValue(Constants.JwtLifeTimeClaimType);
+
+        if (userId is null || lifeTime is null)
+            return TypedResults.NotFound();
+
+        var result = await anonymousChatDb.GetUpdatesCountAsync(chatId, cancellationToken);
+
+        if (result is null)
+            return TypedResults.NotFound();
+
+        return TypedResults.Ok(result.Value);
     }
 }
