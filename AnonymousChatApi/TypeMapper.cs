@@ -20,8 +20,11 @@ public static class TypeMapper
     public static ChatDto ToDto(this Chat chat) => new(
         Id: chat.Id,
         Name: chat.Name,
-        CreatedAt: chat.CreatedAt);
+        CreatedAt: chat.CreatedAt,
+        ChatUsers: chat.ChatUsers.Select(chatUser => chatUser.ToDto()).ToList());
 
+    public static ChatUserDto ToDto(this ChatUser user) => new ChatUserDto(user.UserId, user.UserName);
+    
     public static UserDto ToDto(this User user) => new(
         Id: user.Id,
         Login: user.Login,

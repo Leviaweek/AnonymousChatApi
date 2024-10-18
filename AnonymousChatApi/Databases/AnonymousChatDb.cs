@@ -1,14 +1,12 @@
 using AnonymousChatApi.Databases.Models;
-using AnonymousChatApi.Enums;
 using AnonymousChatApi.Models.Dtos;
 using AnonymousChatApi.Models.Events;
+using Bogus;
 using Microsoft.EntityFrameworkCore;
-using Npgsql;
 using EventHandler = AnonymousChatApi.Services.EventHandler;
 
 namespace AnonymousChatApi.Databases;
 
-//ToDo be sure to replace with ef core
 public sealed class AnonymousChatDb(
     ILogger<AnonymousChatDb> logger,
     EventHandler handler,
@@ -44,7 +42,7 @@ public sealed class AnonymousChatDb(
             UserId = message.SenderId,
             TextMessage = new TextMessage
             {
-                Text = message.TextMessage!.Text
+                Text = message.TextMessage.Text
             },
             NotifyMessage = null,
             IsDeleted = false
@@ -155,7 +153,8 @@ public sealed class AnonymousChatDb(
             UserId = user.Id,
             LastReadMessageId = null,
             User = user,
-            Chat = chat
+            Chat = chat,
+            UserName = new Faker().Name.FullName()
         };
         
         chat.ChatUsers.Add(newChatUser);
@@ -215,7 +214,8 @@ public sealed class AnonymousChatDb(
         
         if (count is 0)
         {
-            return await AddChatAsync("RandomChat", cancellationToken);
+            var name = new Faker().Random.String(16);
+            return await AddChatAsync(name, cancellationToken);
         }
         var chatIndex = random.Next(count);
         var chat = chatsWithoutUser.Skip(chatIndex).First().Chat;
@@ -270,5 +270,27 @@ public sealed class AnonymousChatDb(
             .CountAsync(cancellationToken: cancellationToken);
         
         return count;
+    }
+
+    public async ValueTask<List<ChatDto>> GetAllUserChatsAsync(long userId, CancellationToken cancellationToken)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var chats = db.ChatUsers
+            .Where(chatUser => chatUser.UserId == userId)
+            .Select(chatUser => chatUser.Chat)
+            .Include(chat => chat.ChatUsers);
+
+        return await chats.Select(chat => chat.ToDto()).ToListAsync(cancellationToken: cancellationToken);
+    }
+
+    public async ValueTask<bool> DeleteChatAsync(long chatId, CancellationToken cancellationToken)
+    {
+        await using var db = await contextFactory.CreateDbContextAsync(cancellationToken);
+
+        var result = await db.Chats.Where(chat => chat.Id == chatId)
+            .ExecuteDeleteAsync(cancellationToken: cancellationToken);
+
+        return result == 1;
     }
 }

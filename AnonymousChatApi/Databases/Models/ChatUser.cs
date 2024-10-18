@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
@@ -10,9 +11,11 @@ namespace AnonymousChatApi.Databases.Models;
 public sealed record ChatUser
 {
     public required long UserId { get; set; }
+    
+    [MaxLength(50)]
+    public required string UserName { get; set; }
     public required long ChatId { get; set; }
     public required long? LastReadMessageId { get; set; }
-
     public required Chat Chat { get; set; }
     public required User User { get; set; }
 }

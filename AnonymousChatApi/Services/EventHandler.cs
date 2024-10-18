@@ -1,8 +1,6 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using AnonymousChatApi.Abstractions;
-using AnonymousChatApi.Models.Dtos;
-using AnonymousChatApi.Models.Events;
 
 namespace AnonymousChatApi.Services;
 

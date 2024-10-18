@@ -60,6 +60,11 @@ namespace AnonymousChatApi.Migrations
                     b.Property<long?>("LastReadMessageId")
                         .HasColumnType("bigint");
 
+                    b.Property<string>("UserName")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
                     b.HasKey("UserId", "ChatId");
 
                     b.HasIndex("ChatId");

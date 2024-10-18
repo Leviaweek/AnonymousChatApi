@@ -13,9 +13,9 @@ public sealed class MessageController(AnonymousChatDb anonymousChatDb): Controll
     [HttpGet("get-messages")]
     public async Task<Results<Ok<List<MessageDto>>, NotFound>> GetMessagesAsync(
         [FromQuery] long chatId,
-        [FromQuery] long countFrom,
         [FromQuery] string sortingType,
         CancellationToken cancellationToken,
+        [FromQuery] long countFrom = long.MaxValue,
         [FromQuery] int count = 50)
     {
         var userId = User.FindFirstValue(Constants.JwtUserIdClaimType);

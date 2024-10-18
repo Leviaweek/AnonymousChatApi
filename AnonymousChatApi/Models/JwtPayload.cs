@@ -21,17 +21,10 @@ public sealed class JwtPayload(long userId, DateTimeOffset createdAt, TimeSpan l
         }
 
         ReadOnlySpan<char> decodedPayload = Base64UrlEncoder.Decode(encodedPayload);
-        try
-        {
-            var payload = JsonSerializer.Deserialize<JwtPayload>(decodedPayload);
-            if (payload is null)
-                throw new ArgumentException("Invalid parameter:", nameof(token));
-                
-            return payload;
-        }
-        catch (JsonException)
-        {
+        var payload = JsonSerializer.Deserialize<JwtPayload>(decodedPayload);
+        if (payload is null)
             throw new ArgumentException("Invalid parameter:", nameof(token));
-        }
+        
+        return payload;
     }
 }

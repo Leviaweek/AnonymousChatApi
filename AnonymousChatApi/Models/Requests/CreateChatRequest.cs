@@ -1,4 +1,4 @@
 namespace AnonymousChatApi.Models.Requests;
 
 [Serializable]
-public sealed record CreateChatRequest(long UserId, string Name);
+public sealed record CreateChatRequest(long UserId);
